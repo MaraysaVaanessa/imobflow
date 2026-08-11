@@ -12,3 +12,9 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Metadados de ferramentas de IA (não fazem parte do projeto)
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
