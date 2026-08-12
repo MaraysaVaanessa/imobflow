@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import jwt from "jsonwebtoken";
+import cors from "cors";
 
 const app = express();
 const PORT = 3333;
@@ -13,6 +14,8 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 // Middleware: permite o Express entender dados enviados em JSON
+app.use(cors());
+
 app.use(express.json());
 
 app.get("/", (req, res) => {

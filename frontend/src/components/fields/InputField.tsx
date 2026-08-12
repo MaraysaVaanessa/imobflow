@@ -10,9 +10,21 @@ function InputField(props: {
   state?: string;
   disabled?: boolean;
   type?: string;
+  value?: string;
+  onChange?: React.ChangeEventHandler<HTMLInputElement>;
 }) {
-  const { label, id, extra, type, placeholder, variant, state, disabled } =
-    props;
+  const {
+    label,
+    id,
+    extra,
+    type,
+    placeholder,
+    variant,
+    state,
+    disabled,
+    value,
+    onChange,
+  } = props;
 
   return (
     <div className={`${extra}`}>
@@ -29,6 +41,8 @@ function InputField(props: {
         type={type}
         id={id}
         placeholder={placeholder}
+        value={value}
+        onChange={onChange}
         className={`mt-2 flex h-12 w-full items-center justify-center rounded-xl border bg-white/0 p-3 text-sm outline-none ${
           disabled === true
             ? "!border-none !bg-gray-100 dark:!bg-white/5 dark:placeholder:!text-[rgba(255,255,255,0.15)]"
