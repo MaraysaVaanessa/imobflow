@@ -4,19 +4,12 @@ import React from "react";
 import MainDashboard from "views/admin/default";
 import Properties from "views/admin/properties";
 import Profile from "views/admin/profile";
-import DataTables from "views/admin/tables";
 
 // Auth Imports
 import SignIn from "views/auth/SignIn";
 
 // Icon Imports
-import {
-  MdHome,
-  MdBarChart,
-  MdPerson,
-  MdLock,
-  MdApartment,
-} from "react-icons/md";
+import { MdHome, MdPerson, MdLock, MdApartment } from "react-icons/md";
 const routes = [
   {
     name: "Main Dashboard",
@@ -34,13 +27,6 @@ const routes = [
     component: <Properties />,
   },
 
-  {
-    name: "Data Tables",
-    layout: "/admin",
-    icon: <MdBarChart className="h-6 w-6" />,
-    path: "data-tables",
-    component: <DataTables />,
-  },
   {
     name: "Profile",
     layout: "/admin",
