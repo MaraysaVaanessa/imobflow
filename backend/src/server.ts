@@ -13,9 +13,7 @@ const PORT = 3333;
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-// Middleware: permite o Express entender dados enviados em JSON
 app.use(cors());
-
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -26,7 +24,6 @@ app.get("/", (req, res) => {
 app.post("/users", async (req, res) => {
   const { name, email, password } = req.body;
 
-  // "Tritura" a senha antes de guardar (nunca salvamos a senha original)
   const passwordHash = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
@@ -48,7 +45,6 @@ app.post("/users", async (req, res) => {
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  // 1. Busca o usuário pelo email
   const user = await prisma.user.findUnique({
     where: { email },
   });
@@ -57,21 +53,18 @@ app.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Email ou senha inválidos" });
   }
 
-  // 2. Compara a senha digitada com o hash guardado
   const senhaCorreta = await bcrypt.compare(password, user.passwordHash);
 
   if (!senhaCorreta) {
     return res.status(401).json({ error: "Email ou senha inválidos" });
   }
 
-  // 3. Gera o token ("atestado temporário")
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET as string,
     { expiresIn: "7d" },
   );
 
-  // 4. Devolve o token e os dados básicos do usuário
   res.json({
     token,
     user: {
@@ -81,6 +74,34 @@ app.post("/login", async (req, res) => {
       role: user.role,
     },
   });
+});
+
+// Middleware: confere se a requisição tem um token válido
+function autenticar(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token não fornecido" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET as string);
+    (req as any).usuario = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+}
+
+// Rota de teste protegida
+app.get("/me", autenticar, (req, res) => {
+  res.json({ usuario: (req as any).usuario });
 });
 
 app.listen(PORT, () => {
