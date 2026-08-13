@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import InputField from "components/fields/InputField";
 import { FcGoogle } from "react-icons/fc";
 import Checkbox from "components/checkbox";
@@ -7,6 +8,7 @@ export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState("");
+  const navigate = useNavigate();
 
   const handleSignIn = async () => {
     setErro("");
@@ -22,7 +24,8 @@ export default function SignIn() {
         return;
       }
       localStorage.setItem("token", data.token);
-      alert("Login realizado com sucesso!");
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/admin/default");
     } catch (err) {
       setErro("Nao foi possivel conectar ao servidor");
     }
