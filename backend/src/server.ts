@@ -107,3 +107,18 @@ app.get("/me", autenticar, (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
+// Rota de estatísticas do dashboard
+app.get("/stats", autenticar, async (req, res) => {
+  const totalUsuarios = await prisma.user.count();
+
+  res.json({
+    imoveis: 0,
+    contratos: 0,
+    proprietarios: 0,
+    inquilinos: 0,
+    manutencoesPendentes: 0,
+    receitaDoMes: 0,
+    usuariosCadastrados: totalUsuarios,
+  });
+});

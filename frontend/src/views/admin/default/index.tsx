@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import WeeklyRevenue from "views/admin/default/components/WeeklyRevenue";
 
 import { MdBarChart, MdDashboard } from "react-icons/md";
@@ -8,6 +9,35 @@ import CheckTable from "views/admin/default/components/CheckTable";
 import tableDataCheck from "./variables/tableDataCheck";
 
 const Dashboard = () => {
+  const [stats, setStats] = useState({
+    imoveis: 0,
+    contratos: 0,
+    proprietarios: 0,
+    inquilinos: 0,
+    manutencoesPendentes: 0,
+    receitaDoMes: 0,
+  });
+
+  useEffect(() => {
+    const buscarStats = async () => {
+      const token = localStorage.getItem("token");
+
+      try {
+        const response = await fetch("http://localhost:3333/stats", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await response.json();
+        setStats(data);
+      } catch (err) {
+        console.error("Erro ao buscar estatísticas", err);
+      }
+    };
+
+    buscarStats();
+  }, []);
+
   return (
     <div>
       {/* Card widget */}
@@ -16,32 +46,32 @@ const Dashboard = () => {
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}
           title={"Imóveis Cadastrados"}
-          subtitle={"0"}
+          subtitle={String(stats.imoveis)}
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Contratos Ativos"}
-          subtitle={"0"}
+          subtitle={String(stats.contratos)}
         />
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}
           title={"Proprietários"}
-          subtitle={"0"}
+          subtitle={String(stats.proprietarios)}
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Inquilinos"}
-          subtitle={"0"}
+          subtitle={String(stats.inquilinos)}
         />
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}
           title={"Manutenções Pendentes"}
-          subtitle={"0"}
+          subtitle={String(stats.manutencoesPendentes)}
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Receita do Mês"}
-          subtitle={"R$ 0,00"}
+          subtitle={`R$ ${stats.receitaDoMes.toFixed(2)}`}
         />
       </div>
 
