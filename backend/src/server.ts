@@ -104,16 +104,13 @@ app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
-
 // Rota de estatísticas do dashboard
 app.get("/stats", autenticar, async (req, res) => {
   const totalUsuarios = await prisma.user.count();
+  const totalImoveis = await prisma.property.count();
 
   res.json({
-    imoveis: 0,
+    imoveis: totalImoveis,
     contratos: 0,
     proprietarios: 0,
     inquilinos: 0,
@@ -121,4 +118,65 @@ app.get("/stats", autenticar, async (req, res) => {
     receitaDoMes: 0,
     usuariosCadastrados: totalUsuarios,
   });
+});
+
+// CREATE: Rota de cadastro de imóvel
+app.post("/properties", autenticar, async (req, res) => {
+  const { address, type, rentValue, bedrooms, bathrooms } = req.body;
+
+  const property = await prisma.property.create({
+    data: {
+      address,
+      type,
+      rentValue,
+      bedrooms,
+      bathrooms,
+    },
+  });
+
+  res.status(201).json(property);
+});
+
+// READ: Rota de listagem de imóveis
+app.get("/properties", autenticar, async (req, res) => {
+  const properties = await prisma.property.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(properties);
+});
+
+// UPDATE: Rota de edição de imóvel
+app.put("/properties/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const { address, type, rentValue, bedrooms, bathrooms, status } = req.body;
+
+  const property = await prisma.property.update({
+    where: { id: Number(id) },
+    data: {
+      address,
+      type,
+      rentValue,
+      bedrooms,
+      bathrooms,
+      status,
+    },
+  });
+
+  res.json(property);
+});
+
+// DELETE: Rota de exclusão de imóvel
+app.delete("/properties/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.property.delete({
+    where: { id: Number(id) },
+  });
+
+  res.status(204).send();
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

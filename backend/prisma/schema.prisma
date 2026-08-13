@@ -20,3 +20,15 @@ model User {
   role         String   @default("operador")
   createdAt    DateTime @default(now())
 }
+
+model Property {
+  id Int @id @default(autoincrement())
+  address String
+  type String
+  rentValue Decimal
+  bedrooms Int
+  bathrooms Int
+  status String @default("disponivel")
+  createdAt DateTime @default(now())
+
+}
