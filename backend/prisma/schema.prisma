@@ -32,3 +32,13 @@ model Property {
   createdAt DateTime @default(now())
 
 }
+
+model Owner {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String
+  cpf       String   @unique
+  address   String
+  createdAt DateTime @default(now())
+}
