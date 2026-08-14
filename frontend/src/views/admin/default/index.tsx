@@ -28,6 +28,12 @@ const Dashboard = () => {
             Authorization: `Bearer ${token}`,
           },
         });
+
+        if (!response.ok) {
+          console.error("Erro ao buscar estatísticas: resposta não OK");
+          return;
+        }
+
         const data = await response.json();
         setStats(data);
       } catch (err) {
@@ -71,7 +77,7 @@ const Dashboard = () => {
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Receita do Mês"}
-          subtitle={`R$ ${stats.receitaDoMes.toFixed(2)}`}
+          subtitle={`R$ ${(stats.receitaDoMes ?? 0).toFixed(2)}`}
         />
       </div>
 
