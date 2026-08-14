@@ -9,6 +9,8 @@ const Properties = () => {
   const [rentValue, setRentValue] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
+  const [status, setStatus] = useState("disponivel");
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
 
   const token = localStorage.getItem("token");
@@ -29,11 +31,24 @@ const Properties = () => {
     buscarImoveis();
   }, []);
 
-  const handleCadastrar = async () => {
+  const limparFormulario = () => {
+    setAddress("");
+    setType("");
+    setRentValue("");
+    setBedrooms("");
+    setBathrooms("");
+    setStatus("disponivel");
+    setEditingId(null);
+  };
+
+  const handleSalvar = async () => {
     setErro("");
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
+      const url = editingId ? `${API_URL}/${editingId}` : API_URL;
+      const method = editingId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -44,23 +59,30 @@ const Properties = () => {
           rentValue: Number(rentValue),
           bedrooms: Number(bedrooms),
           bathrooms: Number(bathrooms),
+          status,
         }),
       });
 
       if (!response.ok) {
-        setErro("Erro ao cadastrar imóvel");
+        setErro("Erro ao salvar imóvel");
         return;
       }
 
-      setAddress("");
-      setType("");
-      setRentValue("");
-      setBedrooms("");
-      setBathrooms("");
+      limparFormulario();
       buscarImoveis();
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
+  };
+
+  const handleEditar = (property: any) => {
+    setEditingId(property.id);
+    setAddress(property.address);
+    setType(property.type);
+    setRentValue(String(property.rentValue));
+    setBedrooms(String(property.bedrooms));
+    setBathrooms(String(property.bathrooms));
+    setStatus(property.status);
   };
 
   const handleExcluir = async (id: number) => {
@@ -81,10 +103,10 @@ const Properties = () => {
         Imóveis
       </h1>
 
-      {/* Formulário de cadastro */}
+      {/* Formulário de cadastro/edição */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
-          Cadastrar novo imóvel
+          {editingId ? "Editar imóvel" : "Cadastrar novo imóvel"}
         </h2>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -123,16 +145,37 @@ const Properties = () => {
             onChange={(e) => setBathrooms(e.target.value)}
             className="rounded-lg border p-2 dark:bg-navy-900 dark:text-white"
           />
+          {editingId && (
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="rounded-lg border p-2 dark:bg-navy-900 dark:text-white"
+            >
+              <option value="disponivel">Disponível</option>
+              <option value="alugado">Alugado</option>
+            </select>
+          )}
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
 
-        <button
-          onClick={handleCadastrar}
-          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
-        >
-          Cadastrar
-        </button>
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={handleSalvar}
+            className="rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
+          >
+            {editingId ? "Salvar alterações" : "Cadastrar"}
+          </button>
+
+          {editingId && (
+            <button
+              onClick={limparFormulario}
+              className="rounded-xl border px-5 py-2 font-medium text-navy-700 dark:text-white"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lista de imóveis */}
@@ -163,12 +206,20 @@ const Properties = () => {
                   {property.status}
                 </p>
               </div>
-              <button
-                onClick={() => handleExcluir(property.id)}
-                className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-              >
-                Excluir
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEditar(property)}
+                  className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => handleExcluir(property.id)}
+                  className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                >
+                  Excluir
+                </button>
+              </div>
             </div>
           ))}
         </div>
