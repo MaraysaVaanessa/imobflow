@@ -109,11 +109,13 @@ app.get("/stats", autenticar, async (req, res) => {
   const totalUsuarios = await prisma.user.count();
   const totalImoveis = await prisma.property.count();
   const totalProprietarios = await prisma.owner.count();
+  const totalInquilinos = await prisma.tenant.count();
 
   res.json({
     imoveis: totalImoveis,
     contratos: 0,
     proprietarios: totalProprietarios,
+    inquilinos: totalInquilinos,
   });
 });
 
@@ -168,6 +170,82 @@ app.delete("/properties/:id", autenticar, async (req, res) => {
   const { id } = req.params;
 
   await prisma.property.delete({
+    where: { id: Number(id) },
+  });
+
+  res.status(204).send();
+});
+
+// CREATE: Rota de cadastro de inquilino
+app.post("/tenants", autenticar, async (req, res) => {
+  const {
+    name,
+    phone,
+    email,
+    cpf,
+    guarantorName,
+    guarantorPhone,
+    guarantorAddress,
+  } = req.body;
+
+  const tenant = await prisma.tenant.create({
+    data: {
+      name,
+      phone,
+      email,
+      cpf,
+      guarantorName,
+      guarantorPhone,
+      guarantorAddress,
+    },
+  });
+
+  res.status(201).json(tenant);
+});
+
+// READ: Rota de listagem de inquilinos
+app.get("/tenants", autenticar, async (req, res) => {
+  const tenants = await prisma.tenant.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(tenants);
+});
+
+// UPDATE: Rota de edição de inquilino
+app.put("/tenants/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    phone,
+    email,
+    cpf,
+    guarantorName,
+    guarantorPhone,
+    guarantorAddress,
+  } = req.body;
+
+  const tenant = await prisma.tenant.update({
+    where: { id: Number(id) },
+    data: {
+      name,
+      phone,
+      email,
+      cpf,
+      guarantorName,
+      guarantorPhone,
+      guarantorAddress,
+    },
+  });
+
+  res.json(tenant);
+});
+
+// DELETE: Rota de exclusão de inquilino
+app.delete("/tenants/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.tenant.delete({
     where: { id: Number(id) },
   });
 
