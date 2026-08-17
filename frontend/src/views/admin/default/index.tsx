@@ -11,7 +11,8 @@ import tableDataCheck from "./variables/tableDataCheck";
 const Dashboard = () => {
   const [stats, setStats] = useState({
     imoveis: 0,
-    contratos: 0,
+    contratosAtivos: 0,
+    contratosInativos: 0,
     proprietarios: 0,
     inquilinos: 0,
     manutencoesPendentes: 0,
@@ -57,7 +58,12 @@ const Dashboard = () => {
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Contratos Ativos"}
-          subtitle={String(stats.contratos)}
+          subtitle={String(stats.contratosAtivos)}
+        />
+        <Widget
+          icon={<MdDashboard className="h-6 w-6" />}
+          title={"Contratos Encerrados"}
+          subtitle={String(stats.contratosInativos)}
         />
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}

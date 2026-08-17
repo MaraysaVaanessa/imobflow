@@ -110,13 +110,23 @@ app.get("/stats", autenticar, async (req, res) => {
   const totalImoveis = await prisma.property.count();
   const totalProprietarios = await prisma.owner.count();
   const totalInquilinos = await prisma.tenant.count();
-  const totalContratos = await prisma.contract.count();
+  const contratosAtivos = await prisma.contract.count({
+    where: { status: "ativo" },
+  });
+  const contratosInativos = await prisma.contract.count({
+    where: { status: "encerrado" },
+  });
+  const manutencoesPendentes = await prisma.maintenance.count({
+    where: { status: "pendente" },
+  });
 
   res.json({
     imoveis: totalImoveis,
-    contratos: totalContratos,
+    contratosAtivos,
+    contratosInativos,
     proprietarios: totalProprietarios,
     inquilinos: totalInquilinos,
+    manutencoesPendentes,
   });
 });
 
@@ -401,6 +411,67 @@ app.delete("/payments/:id", autenticar, async (req, res) => {
   const { id } = req.params;
 
   await prisma.payment.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
+});
+
+// ===== MANUTENÇÕES =====
+
+app.post("/maintenances", autenticar, async (req, res) => {
+  const { description, estimatedCost, propertyId } = req.body;
+
+  const maintenance = await prisma.maintenance.create({
+    data: {
+      description,
+      estimatedCost,
+      propertyId,
+    },
+  });
+
+  res.status(201).json(maintenance);
+});
+
+app.get("/maintenances", autenticar, async (req, res) => {
+  const maintenances = await prisma.maintenance.findMany({
+    orderBy: { openedAt: "desc" },
+    include: {
+      property: true,
+    },
+  });
+
+  res.json(maintenances);
+});
+
+app.put("/maintenances/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const { description, estimatedCost, status } = req.body;
+
+  const maintenance = await prisma.maintenance.update({
+    where: { id: Number(id) },
+    data: { description, estimatedCost, status },
+  });
+
+  res.json(maintenance);
+});
+
+app.put("/maintenances/:id/concluir", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  const maintenance = await prisma.maintenance.update({
+    where: { id: Number(id) },
+    data: {
+      status: "concluida",
+      resolvedAt: new Date(),
+    },
+  });
+
+  res.json(maintenance);
+});
+
+app.delete("/maintenances/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.maintenance.delete({ where: { id: Number(id) } });
 
   res.status(204).send();
 });

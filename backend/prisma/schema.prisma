@@ -31,6 +31,7 @@ model Property {
   status String @default("disponivel")
   createdAt DateTime @default(now())
   contracts Contract[]
+  maintenances Maintenance[]
 }
 
 model Owner {
@@ -88,4 +89,16 @@ model Payment {
 
   contractId  Int
   contract    Contract  @relation(fields: [contractId], references: [id])
+}
+
+model Maintenance {
+  id             Int       @id @default(autoincrement())
+  description    String
+  status         String    @default("pendente")
+  openedAt       DateTime  @default(now())
+  estimatedCost  Decimal
+  resolvedAt     DateTime?
+
+  propertyId     Int
+  property       Property  @relation(fields: [propertyId], references: [id])
 }
