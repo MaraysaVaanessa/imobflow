@@ -32,6 +32,7 @@ model Property {
   createdAt DateTime @default(now())
   contracts Contract[]
   maintenances Maintenance[]
+  appointments Appointment[]
 }
 
 model Owner {
@@ -101,4 +102,16 @@ model Maintenance {
 
   propertyId     Int
   property       Property  @relation(fields: [propertyId], references: [id])
+}
+
+model Appointment {
+  id           Int       @id @default(autoincrement())
+  title        String
+  description  String?
+  date         DateTime
+  status       String    @default("pendente")
+  createdAt    DateTime  @default(now())
+
+  propertyId   Int?
+  property     Property? @relation(fields: [propertyId], references: [id])
 }

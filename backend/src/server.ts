@@ -476,6 +476,60 @@ app.delete("/maintenances/:id", autenticar, async (req, res) => {
   res.status(204).send();
 });
 
+// ===== AGENDA =====
+
+app.post("/appointments", autenticar, async (req, res) => {
+  const { title, description, date, propertyId } = req.body;
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      title,
+      description,
+      date: new Date(date),
+      propertyId: propertyId ? Number(propertyId) : null,
+    },
+  });
+
+  res.status(201).json(appointment);
+});
+
+app.get("/appointments", autenticar, async (req, res) => {
+  const appointments = await prisma.appointment.findMany({
+    orderBy: { date: "asc" },
+    include: {
+      property: true,
+    },
+  });
+
+  res.json(appointments);
+});
+
+app.put("/appointments/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const { title, description, date, status, propertyId } = req.body;
+
+  const appointment = await prisma.appointment.update({
+    where: { id: Number(id) },
+    data: {
+      title,
+      description,
+      date: new Date(date),
+      status,
+      propertyId: propertyId ? Number(propertyId) : null,
+    },
+  });
+
+  res.json(appointment);
+});
+
+app.delete("/appointments/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.appointment.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
