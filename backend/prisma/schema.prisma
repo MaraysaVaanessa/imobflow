@@ -30,7 +30,7 @@ model Property {
   bathrooms Int
   status String @default("disponivel")
   createdAt DateTime @default(now())
-
+  contracts Contract[]
 }
 
 model Owner {
@@ -41,6 +41,7 @@ model Owner {
   cpf       String   @unique
   address   String
   createdAt DateTime @default(now())
+  contracts Contract[]
 }
 
 model Tenant {
@@ -53,4 +54,24 @@ model Tenant {
   guarantorPhone    String
   guarantorAddress  String
   createdAt         DateTime @default(now())
+  contracts Contract[]
+}
+
+model Contract {
+  id          Int      @id @default(autoincrement())
+  startDate   DateTime
+  endDate     DateTime
+  rentValue   Decimal
+  dueDay      Int
+  status      String   @default("ativo")
+  createdAt   DateTime @default(now())
+
+  propertyId  Int
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  ownerId     Int
+  owner       Owner    @relation(fields: [ownerId], references: [id])
+
+  tenantId    Int
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
 }

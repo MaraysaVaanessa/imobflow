@@ -110,33 +110,28 @@ app.get("/stats", autenticar, async (req, res) => {
   const totalImoveis = await prisma.property.count();
   const totalProprietarios = await prisma.owner.count();
   const totalInquilinos = await prisma.tenant.count();
+  const totalContratos = await prisma.contract.count();
 
   res.json({
     imoveis: totalImoveis,
-    contratos: 0,
+    contratos: totalContratos,
     proprietarios: totalProprietarios,
     inquilinos: totalInquilinos,
   });
 });
 
-// CREATE: Rota de cadastro de imóvel
+// ===== IMÓVEIS =====
+
 app.post("/properties", autenticar, async (req, res) => {
   const { address, type, rentValue, bedrooms, bathrooms } = req.body;
 
   const property = await prisma.property.create({
-    data: {
-      address,
-      type,
-      rentValue,
-      bedrooms,
-      bathrooms,
-    },
+    data: { address, type, rentValue, bedrooms, bathrooms },
   });
 
   res.status(201).json(property);
 });
 
-// READ: Rota de listagem de imóveis
 app.get("/properties", autenticar, async (req, res) => {
   const properties = await prisma.property.findMany({
     orderBy: { createdAt: "desc" },
@@ -145,38 +140,68 @@ app.get("/properties", autenticar, async (req, res) => {
   res.json(properties);
 });
 
-// UPDATE: Rota de edição de imóvel
 app.put("/properties/:id", autenticar, async (req, res) => {
   const { id } = req.params;
   const { address, type, rentValue, bedrooms, bathrooms, status } = req.body;
 
   const property = await prisma.property.update({
     where: { id: Number(id) },
-    data: {
-      address,
-      type,
-      rentValue,
-      bedrooms,
-      bathrooms,
-      status,
-    },
+    data: { address, type, rentValue, bedrooms, bathrooms, status },
   });
 
   res.json(property);
 });
 
-// DELETE: Rota de exclusão de imóvel
 app.delete("/properties/:id", autenticar, async (req, res) => {
   const { id } = req.params;
 
-  await prisma.property.delete({
-    where: { id: Number(id) },
-  });
+  await prisma.property.delete({ where: { id: Number(id) } });
 
   res.status(204).send();
 });
 
-// CREATE: Rota de cadastro de inquilino
+// ===== PROPRIETÁRIOS =====
+
+app.post("/owners", autenticar, async (req, res) => {
+  const { name, phone, email, cpf, address } = req.body;
+
+  const owner = await prisma.owner.create({
+    data: { name, phone, email, cpf, address },
+  });
+
+  res.status(201).json(owner);
+});
+
+app.get("/owners", autenticar, async (req, res) => {
+  const owners = await prisma.owner.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(owners);
+});
+
+app.put("/owners/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const { name, phone, email, cpf, address } = req.body;
+
+  const owner = await prisma.owner.update({
+    where: { id: Number(id) },
+    data: { name, phone, email, cpf, address },
+  });
+
+  res.json(owner);
+});
+
+app.delete("/owners/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.owner.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
+});
+
+// ===== INQUILINOS =====
+
 app.post("/tenants", autenticar, async (req, res) => {
   const {
     name,
@@ -203,7 +228,6 @@ app.post("/tenants", autenticar, async (req, res) => {
   res.status(201).json(tenant);
 });
 
-// READ: Rota de listagem de inquilinos
 app.get("/tenants", autenticar, async (req, res) => {
   const tenants = await prisma.tenant.findMany({
     orderBy: { createdAt: "desc" },
@@ -212,7 +236,6 @@ app.get("/tenants", autenticar, async (req, res) => {
   res.json(tenants);
 });
 
-// UPDATE: Rota de edição de inquilino
 app.put("/tenants/:id", autenticar, async (req, res) => {
   const { id } = req.params;
   const {
@@ -241,73 +264,93 @@ app.put("/tenants/:id", autenticar, async (req, res) => {
   res.json(tenant);
 });
 
-// DELETE: Rota de exclusão de inquilino
 app.delete("/tenants/:id", autenticar, async (req, res) => {
   const { id } = req.params;
 
-  await prisma.tenant.delete({
-    where: { id: Number(id) },
+  await prisma.tenant.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
+});
+
+// ===== CONTRATOS =====
+
+app.post("/contracts", autenticar, async (req, res) => {
+  const {
+    startDate,
+    endDate,
+    rentValue,
+    dueDay,
+    propertyId,
+    ownerId,
+    tenantId,
+  } = req.body;
+
+  const contract = await prisma.contract.create({
+    data: {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      rentValue,
+      dueDay,
+      propertyId,
+      ownerId,
+      tenantId,
+    },
   });
+
+  res.status(201).json(contract);
+});
+
+app.get("/contracts", autenticar, async (req, res) => {
+  const contracts = await prisma.contract.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      property: true,
+      owner: true,
+      tenant: true,
+    },
+  });
+
+  res.json(contracts);
+});
+
+app.put("/contracts/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+  const {
+    startDate,
+    endDate,
+    rentValue,
+    dueDay,
+    status,
+    propertyId,
+    ownerId,
+    tenantId,
+  } = req.body;
+
+  const contract = await prisma.contract.update({
+    where: { id: Number(id) },
+    data: {
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      rentValue,
+      dueDay,
+      status,
+      propertyId,
+      ownerId,
+      tenantId,
+    },
+  });
+
+  res.json(contract);
+});
+
+app.delete("/contracts/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.contract.delete({ where: { id: Number(id) } });
 
   res.status(204).send();
 });
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
-
-// CREATE: Rota de cadastro de proprietário
-app.post("/owners", autenticar, async (req, res) => {
-  const { name, phone, email, cpf, address } = req.body;
-
-  const owner = await prisma.owner.create({
-    data: {
-      name,
-      phone,
-      email,
-      cpf,
-      address,
-    },
-  });
-
-  res.status(201).json(owner);
-});
-
-// READ: Rota de listagem de proprietários
-app.get("/owners", autenticar, async (req, res) => {
-  const owners = await prisma.owner.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-
-  res.json(owners);
-});
-
-// UPDATE: Rota de edição de proprietário
-app.put("/owners/:id", autenticar, async (req, res) => {
-  const { id } = req.params;
-  const { name, phone, email, cpf, address } = req.body;
-
-  const owner = await prisma.owner.update({
-    where: { id: Number(id) },
-    data: {
-      name,
-      phone,
-      email,
-      cpf,
-      address,
-    },
-  });
-
-  res.json(owner);
-});
-
-// DELETE: Rota de exclusão de proprietário
-app.delete("/owners/:id", autenticar, async (req, res) => {
-  const { id } = req.params;
-
-  await prisma.owner.delete({
-    where: { id: Number(id) },
-  });
-
-  res.status(204).send();
 });
