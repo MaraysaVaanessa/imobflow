@@ -7,6 +7,7 @@ import Properties from "views/admin/properties";
 import Tenants from "views/admin/tenants";
 import Owners from "views/admin/owners";
 import Profile from "views/admin/profile";
+import Contracts from "views/admin/contracts";
 
 // Auth Imports
 import SignIn from "views/auth/SignIn";
@@ -18,6 +19,7 @@ import {
   MdLock,
   MdApartment,
   MdGroups,
+  MdDescription,
 } from "react-icons/md";
 const routes = [
   {
@@ -50,6 +52,14 @@ const routes = [
     path: "tenants",
     icon: <MdGroups className="h-6 w-6" />,
     component: <Tenants />,
+  },
+
+  {
+    name: "Contratos",
+    layout: "/admin",
+    path: "contracts",
+    icon: <MdDescription className="h-6 w-6" />,
+    component: <Contracts />,
   },
 
   {
