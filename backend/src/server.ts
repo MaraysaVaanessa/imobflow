@@ -351,6 +351,60 @@ app.delete("/contracts/:id", autenticar, async (req, res) => {
   res.status(204).send();
 });
 
+// ===== PAGAMENTOS =====
+
+app.post("/payments", autenticar, async (req, res) => {
+  const { dueDate, value, contractId } = req.body;
+
+  const payment = await prisma.payment.create({
+    data: {
+      dueDate: new Date(dueDate),
+      value,
+      contractId,
+    },
+  });
+
+  res.status(201).json(payment);
+});
+
+app.get("/payments", autenticar, async (req, res) => {
+  const payments = await prisma.payment.findMany({
+    orderBy: { dueDate: "asc" },
+    include: {
+      contract: {
+        include: {
+          property: true,
+          tenant: true,
+        },
+      },
+    },
+  });
+
+  res.json(payments);
+});
+
+app.put("/payments/:id/pagar", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  const payment = await prisma.payment.update({
+    where: { id: Number(id) },
+    data: {
+      status: "pago",
+      paidAt: new Date(),
+    },
+  });
+
+  res.json(payment);
+});
+
+app.delete("/payments/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.payment.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

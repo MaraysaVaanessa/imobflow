@@ -74,4 +74,18 @@ model Contract {
 
   tenantId    Int
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  payments Payment[]
+
+}
+
+model Payment {
+  id          Int       @id @default(autoincrement())
+  dueDate     DateTime
+  value       Decimal
+  status      String    @default("pendente")
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  contractId  Int
+  contract    Contract  @relation(fields: [contractId], references: [id])
 }
