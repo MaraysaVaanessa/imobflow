@@ -11,6 +11,7 @@ import Contracts from "views/admin/contracts";
 import Payments from "views/admin/payments";
 import Maintenances from "views/admin/maintenances";
 import Appointments from "views/admin/appointments";
+import Reports from "views/admin/reports";
 // Auth Imports
 import SignIn from "views/auth/SignIn";
 
@@ -25,6 +26,7 @@ import {
   MdAttachMoney,
   MdBuild,
   MdEvent,
+  MdAssessment,
 } from "react-icons/md";
 const routes = [
   {
@@ -86,6 +88,13 @@ const routes = [
     path: "appointments",
     icon: <MdEvent className="h-6 w-6" />,
     component: <Appointments />,
+  },
+  {
+    name: "Relatórios",
+    layout: "/admin",
+    path: "reports",
+    icon: <MdAssessment className="h-6 w-6" />,
+    component: <Reports />,
   },
   {
     name: "Profile",
