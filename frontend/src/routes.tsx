@@ -11,6 +11,7 @@ import Contracts from "views/admin/contracts";
 import Payments from "views/admin/payments";
 import Maintenances from "views/admin/maintenances";
 import Appointments from "views/admin/appointments";
+import Assistant from "views/admin/assistant";
 import Reports from "views/admin/reports";
 // Auth Imports
 import SignIn from "views/auth/SignIn";
@@ -27,6 +28,7 @@ import {
   MdBuild,
   MdEvent,
   MdAssessment,
+  MdSmartToy,
 } from "react-icons/md";
 const routes = [
   {
@@ -95,6 +97,13 @@ const routes = [
     path: "reports",
     icon: <MdAssessment className="h-6 w-6" />,
     component: <Reports />,
+  },
+  {
+    name: "Assistente IA",
+    layout: "/admin",
+    path: "assistant",
+    icon: <MdSmartToy className="h-6 w-6" />,
+    component: <Assistant />,
   },
   {
     name: "Profile",
