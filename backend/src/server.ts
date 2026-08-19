@@ -530,6 +530,63 @@ app.delete("/appointments/:id", autenticar, async (req, res) => {
   res.status(204).send();
 });
 
+// ===== RELATÓRIOS =====
+
+// Resumo financeiro: total pago vs total pendente
+app.get("/reports/financial", autenticar, async (req, res) => {
+  const pagos = await prisma.payment.aggregate({
+    where: { status: "pago" },
+    _sum: { value: true },
+  });
+
+  const pendentes = await prisma.payment.aggregate({
+    where: { status: "pendente" },
+    _sum: { value: true },
+  });
+
+  res.json({
+    totalPago: pagos._sum.value ?? 0,
+    totalPendente: pendentes._sum.value ?? 0,
+  });
+});
+
+// Imóveis por status
+app.get("/reports/properties-status", autenticar, async (req, res) => {
+  const disponiveis = await prisma.property.count({
+    where: { status: "disponivel" },
+  });
+
+  const alugados = await prisma.property.count({
+    where: { status: "alugado" },
+  });
+
+  res.json({ disponiveis, alugados });
+});
+
+// Contratos vencendo nos próximos 30 dias
+app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
+  const hoje = new Date();
+  const em30Dias = new Date();
+  em30Dias.setDate(hoje.getDate() + 30);
+
+  const contratos = await prisma.contract.findMany({
+    where: {
+      status: "ativo",
+      endDate: {
+        gte: hoje,
+        lte: em30Dias,
+      },
+    },
+    orderBy: { endDate: "asc" },
+    include: {
+      property: true,
+      tenant: true,
+    },
+  });
+
+  res.json(contratos);
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
