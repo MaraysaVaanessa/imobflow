@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PhotoUpload from "components/photoUpload/PhotoUpload";
 
 const API_URL = "http://localhost:3333/owners";
 
@@ -9,6 +10,7 @@ const Owners = () => {
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
   const [address, setAddress] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
 
@@ -36,6 +38,7 @@ const Owners = () => {
     setEmail("");
     setCpf("");
     setAddress("");
+    setPhotoUrl("");
     setEditingId(null);
   };
 
@@ -51,7 +54,7 @@ const Owners = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name, phone, email, cpf, address }),
+        body: JSON.stringify({ name, phone, email, cpf, address, photoUrl }),
       });
 
       if (!response.ok) {
@@ -73,6 +76,7 @@ const Owners = () => {
     setEmail(owner.email);
     setCpf(owner.cpf);
     setAddress(owner.address);
+    setPhotoUrl(owner.photoUrl || "");
   };
 
   const handleExcluir = async (id: number) => {
@@ -98,6 +102,13 @@ const Owners = () => {
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           {editingId ? "Editar proprietário" : "Cadastrar novo proprietário"}
         </h2>
+
+        <div className="mb-4">
+          <PhotoUpload
+            photoUrl={photoUrl}
+            onUploaded={(url) => setPhotoUrl(url)}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <input
@@ -176,16 +187,25 @@ const Owners = () => {
               key={owner.id}
               className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
             >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {owner.name}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {owner.phone} • {owner.email} • CPF: {owner.cpf}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {owner.address}
-                </p>
+              <div className="flex items-center gap-3">
+                {owner.photoUrl && (
+                  <img
+                    src={owner.photoUrl}
+                    alt={owner.name}
+                    className="h-14 w-14 rounded-full object-cover"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {owner.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {owner.phone} • {owner.email} • CPF: {owner.cpf}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {owner.address}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button

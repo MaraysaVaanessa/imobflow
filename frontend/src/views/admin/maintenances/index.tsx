@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PhotoUpload from "components/photoUpload/PhotoUpload";
 
 const API_URL = "http://localhost:3333";
 
@@ -9,6 +10,7 @@ const Maintenances = () => {
   const [propertyId, setPropertyId] = useState("");
   const [description, setDescription] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [erro, setErro] = useState("");
 
   const token = localStorage.getItem("token");
@@ -45,6 +47,7 @@ const Maintenances = () => {
           propertyId: Number(propertyId),
           description,
           estimatedCost: Number(estimatedCost),
+          photoUrl,
         }),
       });
 
@@ -56,6 +59,7 @@ const Maintenances = () => {
       setPropertyId("");
       setDescription("");
       setEstimatedCost("");
+      setPhotoUrl("");
       buscarTudo();
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
@@ -97,6 +101,13 @@ const Maintenances = () => {
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Registrar nova manutenção
         </h2>
+
+        <div className="mb-4">
+          <PhotoUpload
+            photoUrl={photoUrl}
+            onUploaded={(url) => setPhotoUrl(url)}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <select
@@ -157,23 +168,32 @@ const Maintenances = () => {
               key={maintenance.id}
               className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
             >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {maintenance.property?.address}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {maintenance.description} • Custo estimado: R${" "}
-                  {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
-                  <span
-                    className={
-                      maintenance.status === "concluida"
-                        ? "font-medium text-green-600"
-                        : "font-medium text-orange-500"
-                    }
-                  >
-                    {maintenance.status}
-                  </span>
-                </p>
+              <div className="flex items-center gap-3">
+                {maintenance.photoUrl && (
+                  <img
+                    src={maintenance.photoUrl}
+                    alt={maintenance.description}
+                    className="h-14 w-14 rounded-lg object-cover"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {maintenance.property?.address}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {maintenance.description} • Custo estimado: R${" "}
+                    {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
+                    <span
+                      className={
+                        maintenance.status === "concluida"
+                          ? "font-medium text-green-600"
+                          : "font-medium text-orange-500"
+                      }
+                    >
+                      {maintenance.status}
+                    </span>
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2">
                 {maintenance.status === "pendente" && (
