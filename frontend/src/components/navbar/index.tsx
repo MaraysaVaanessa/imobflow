@@ -2,17 +2,11 @@ import React from "react";
 import Dropdown from "components/dropdown";
 import { FiAlignJustify } from "react-icons/fi";
 import { Link } from "react-router-dom";
-import navbarimage from "assets/img/layout/Navbar.png";
-import { BsArrowBarUp } from "react-icons/bs";
 import { FiSearch } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { RiMoonFill, RiSunFill } from "react-icons/ri";
 import { useEffect, useState } from "react";
-import {
-  IoMdNotificationsOutline,
-  IoMdInformationCircleOutline,
-} from "react-icons/io";
-import avatar from "assets/img/avatars/avatar4.png";
+import { IoMdNotificationsOutline } from "react-icons/io";
 
 const Navbar = (props: {
   onOpenSidenav: () => void;
@@ -36,17 +30,43 @@ const Navbar = (props: {
         console.error("Erro ao buscar notificações", err);
       }
     };
-
     buscarNotificacoes();
   }, []);
+
   const navigate = useNavigate();
   const userString = localStorage.getItem("user");
   const user = userString ? JSON.parse(userString) : null;
+  const iniciais = user?.name
+    ?.split(" ")
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/auth/sign-in");
+  };
+
+  const irParaProfile = (e: any) => {
+    e.preventDefault();
+    navigate("/admin/profile");
+  };
+
+  const sair = (e: any) => {
+    e.preventDefault();
+    handleLogout();
+  };
+
+  const alternarTema = () => {
+    if (darkmode) {
+      document.body.classList.remove("dark");
+      setDarkmode(false);
+    } else {
+      document.body.classList.add("dark");
+      setDarkmode(true);
+    }
   };
 
   return (
@@ -97,7 +117,7 @@ const Navbar = (props: {
         >
           <FiAlignJustify className="h-5 w-5" />
         </span>
-        {/* start Notification */}
+
         <Dropdown
           button={
             <p className="relative cursor-pointer">
@@ -115,13 +135,11 @@ const Navbar = (props: {
                   Notificações
                 </p>
               </div>
-
               {notificacoes.length === 0 && (
                 <p className="text-sm text-gray-500 dark:text-gray-300">
                   Nenhuma notificação no momento.
                 </p>
               )}
-
               {notificacoes.map((n, index) => (
                 <div key={index} className="flex w-full items-center">
                   <div className="ml-2 flex h-full w-full flex-col justify-center rounded-lg px-1 text-sm">
@@ -136,75 +154,19 @@ const Navbar = (props: {
           classNames={"py-2 top-4 -left-[230px] md:-left-[440px] w-max"}
         />
 
-        {/* start Horizon PRO */}
-        <Dropdown
-          button={
-            <p className="cursor-pointer">
-              <IoMdInformationCircleOutline className="h-4 w-4 text-gray-600 dark:text-white" />
-            </p>
-          }
-          children={
-            <div className="flex w-[350px] flex-col gap-2 rounded-[20px] bg-white p-4 shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
-              <div
-                style={{
-                  backgroundImage: `url(${navbarimage})`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "cover",
-                }}
-                className="mb-2 aspect-video w-full rounded-lg"
-              />
-              <a
-                target="blank"
-                href="https://horizon-ui.com/pro?ref=live-free-tailwind-react"
-                className="px-full linear flex cursor-pointer items-center justify-center rounded-xl bg-brand-500 py-[11px] font-bold text-white transition duration-200 hover:bg-brand-600 hover:text-white active:bg-brand-700 dark:bg-brand-400 dark:hover:bg-brand-300 dark:active:bg-brand-200"
-              >
-                Buy Horizon UI PRO
-              </a>
-              <a
-                target="blank"
-                href="https://horizon-ui.com/docs-tailwind/docs/react/installation?ref=live-free-tailwind-react"
-                className="px-full linear flex cursor-pointer items-center justify-center rounded-xl border py-[11px] font-bold text-navy-700 transition duration-200 hover:bg-gray-200 hover:text-navy-700 dark:!border-white/10 dark:text-white dark:hover:bg-white/20 dark:hover:text-white dark:active:bg-white/10"
-              >
-                See Documentation
-              </a>
-              <a
-                target="blank"
-                href="https://horizon-ui.com/?ref=live-free-tailwind-react"
-                className="hover:bg-black px-full linear flex cursor-pointer items-center justify-center rounded-xl py-[11px] font-bold text-navy-700 transition duration-200 hover:text-navy-700 dark:text-white dark:hover:text-white"
-              >
-                Try Horizon Free
-              </a>
-            </div>
-          }
-          classNames={"py-2 top-6 -left-[250px] md:-left-[330px] w-max"}
-          animation="origin-[75%_0%] md:origin-top-right transition-all duration-300 ease-in-out"
-        />
-        <div
-          className="cursor-pointer text-gray-600"
-          onClick={() => {
-            if (darkmode) {
-              document.body.classList.remove("dark");
-              setDarkmode(false);
-            } else {
-              document.body.classList.add("dark");
-              setDarkmode(true);
-            }
-          }}
-        >
+        <div className="cursor-pointer text-gray-600" onClick={alternarTema}>
           {darkmode ? (
             <RiSunFill className="h-4 w-4 text-gray-600 dark:text-white" />
           ) : (
             <RiMoonFill className="h-4 w-4 text-gray-600 dark:text-white" />
           )}
         </div>
-        {/* Profile & Dropdown */}
+
         <Dropdown
           button={
-            <img
-              className="h-10 w-10 rounded-full"
-              src={avatar}
-              alt="Elon Musk"
-            />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">
+              {iniciais || "?"}
+            </div>
           }
           children={
             <div className="flex h-48 w-56 flex-col justify-start rounded-[20px] bg-white bg-cover bg-no-repeat shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
@@ -212,30 +174,21 @@ const Navbar = (props: {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-navy-700 dark:text-white">
                     👋 Hey, {user ? user.name : "Visitante"}
-                  </p>{" "}
+                  </p>
                 </div>
               </div>
               <div className="mt-3 h-px w-full bg-gray-200 dark:bg-white/20 " />
-
               <div className="ml-4 mt-3 flex flex-col">
                 <a
                   href=" "
-                  className="text-sm text-gray-800 dark:text-white hover:dark:text-white"
+                  onClick={irParaProfile}
+                  className="cursor-pointer text-sm text-gray-800 dark:text-white hover:dark:text-white"
                 >
                   Profile Settings
                 </a>
                 <a
                   href=" "
-                  className="mt-3 text-sm text-gray-800 dark:text-white hover:dark:text-white"
-                >
-                  Newsletter Settings
-                </a>
-                <a
-                  href=" "
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleLogout();
-                  }}
+                  onClick={sair}
                   className="mt-3 cursor-pointer text-sm font-medium text-red-500 hover:text-red-500"
                 >
                   Log Out

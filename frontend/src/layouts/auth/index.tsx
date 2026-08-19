@@ -1,5 +1,4 @@
 import Footer from "components/footer/FooterAuthDefault";
-import authImg from "assets/img/auth/auth.png";
 import { Link, Routes, Route, Navigate } from "react-router-dom";
 import routes from "routes";
 import FixedPlugin from "components/fixedPlugin/FixedPlugin";
@@ -24,7 +23,7 @@ export default function Auth() {
         <main className={`mx-auto min-h-screen`}>
           <div className="relative flex">
             <div className="mx-auto flex min-h-full w-full flex-col justify-start pt-12 md:max-w-[75%] lg:h-screen lg:max-w-[1013px] lg:px-8 lg:pt-0 xl:h-[100vh] xl:max-w-[1383px] xl:px-0 xl:pl-[70px]">
-              <div className="mb-auto flex flex-col pl-5 pr-5 md:pr-0 md:pl-12 lg:max-w-[48%] lg:pl-0 xl:max-w-full">
+              <div className="mb-auto flex flex-col pl-5 pr-5 md:pl-12 md:pr-0 lg:max-w-[48%] lg:pl-0 xl:max-w-full">
                 <Link to="/admin" className="mt-0 w-max lg:pt-10">
                   <div className="mx-auto flex h-fit w-fit items-center hover:cursor-pointer">
                     <svg
@@ -52,10 +51,12 @@ export default function Auth() {
                   />
                 </Routes>
                 <div className="absolute right-0 hidden h-full min-h-screen md:block lg:w-[49vw] 2xl:w-[44vw]">
-                  <div
-                    className="absolute flex h-full w-full items-end justify-center bg-cover bg-center"
-                    style={{ backgroundImage: `url(${authImg})` }}
-                  />
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-brand-400 to-brand-700">
+                    <h1 className="text-5xl font-bold text-white">ImobFlow</h1>
+                    <p className="mt-3 text-lg text-white/80">
+                      Gestão inteligente para seus imóveis
+                    </p>
+                  </div>
                 </div>
               </div>
               <Footer />
