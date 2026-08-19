@@ -553,6 +553,31 @@ app.get("/reports/financial", autenticar, async (req, res) => {
   });
 });
 
+app.get("/search", autenticar, async (req, res) => {
+  const query = String(req.query.q || "");
+
+  if (!query.trim()) {
+    return res.json({ properties: [], owners: [], tenants: [] });
+  }
+
+  const properties = await prisma.property.findMany({
+    where: { address: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  const owners = await prisma.owner.findMany({
+    where: { name: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  const tenants = await prisma.tenant.findMany({
+    where: { name: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  res.json({ properties, owners, tenants });
+});
+
 // Imóveis por status
 app.get("/reports/properties-status", autenticar, async (req, res) => {
   const disponiveis = await prisma.property.count({

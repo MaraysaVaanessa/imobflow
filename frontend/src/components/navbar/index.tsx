@@ -1,9 +1,8 @@
 import React from "react";
 import Dropdown from "components/dropdown";
 import { FiAlignJustify } from "react-icons/fi";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { FiSearch } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
 import { RiMoonFill, RiSunFill } from "react-icons/ri";
 import { useEffect, useState } from "react";
 import { IoMdNotificationsOutline } from "react-icons/io";
@@ -16,6 +15,14 @@ const Navbar = (props: {
   const { onOpenSidenav, brandText } = props;
   const [darkmode, setDarkmode] = React.useState(false);
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<any>({
+    properties: [],
+    owners: [],
+    tenants: [],
+  });
+  const [showResults, setShowResults] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const buscarNotificacoes = async () => {
@@ -33,9 +40,34 @@ const Navbar = (props: {
     buscarNotificacoes();
   }, []);
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    if (searchTerm.trim().length < 2) {
+      setSearchResults({ properties: [], owners: [], tenants: [] });
+      setShowResults(false);
+      return;
+    }
+
+    const delay = setTimeout(async () => {
+      const token = localStorage.getItem("token");
+      try {
+        const response = await fetch(
+          `http://localhost:3333/search?q=${encodeURIComponent(searchTerm)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = await response.json();
+        setSearchResults(data);
+        setShowResults(true);
+      } catch (err) {
+        console.error("Erro ao buscar", err);
+      }
+    }, 400);
+
+    return () => clearTimeout(delay);
+  }, [searchTerm]);
+
   const userString = localStorage.getItem("user");
   const user = userString ? JSON.parse(userString) : null;
+
   const iniciais = user?.name
     ?.split(" ")
     .map((n: string) => n[0])
@@ -49,25 +81,10 @@ const Navbar = (props: {
     navigate("/auth/sign-in");
   };
 
-  const irParaProfile = (e: any) => {
-    e.preventDefault();
-    navigate("/admin/profile");
-  };
-
-  const sair = (e: any) => {
-    e.preventDefault();
-    handleLogout();
-  };
-
-  const alternarTema = () => {
-    if (darkmode) {
-      document.body.classList.remove("dark");
-      setDarkmode(false);
-    } else {
-      document.body.classList.add("dark");
-      setDarkmode(true);
-    }
-  };
+  const totalResultados =
+    (searchResults.properties?.length || 0) +
+    (searchResults.owners?.length || 0) +
+    (searchResults.tenants?.length || 0);
 
   return (
     <nav className="sticky top-4 z-40 flex flex-row flex-wrap items-center justify-between rounded-xl bg-white/10 p-2 backdrop-blur-xl dark:bg-[#0b14374d]">
@@ -101,15 +118,78 @@ const Navbar = (props: {
       </div>
 
       <div className="relative mt-[3px] flex h-[61px] w-[355px] flex-grow items-center justify-around gap-2 rounded-full bg-white px-2 py-2 shadow-xl shadow-shadow-500 dark:!bg-navy-800 dark:shadow-none md:w-[365px] md:flex-grow-0 md:gap-1 xl:w-[365px] xl:gap-2">
-        <div className="flex h-full items-center rounded-full bg-lightPrimary text-navy-700 dark:bg-navy-900 dark:text-white xl:w-[225px]">
+        <div className="relative flex h-full items-center rounded-full bg-lightPrimary text-navy-700 dark:bg-navy-900 dark:text-white xl:w-[225px]">
           <p className="pl-3 pr-2 text-xl">
             <FiSearch className="h-4 w-4 text-gray-400 dark:text-white" />
           </p>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Buscar imóvel, proprietário..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() =>
+              searchTerm.trim().length >= 2 && setShowResults(true)
+            }
+            onBlur={() => setTimeout(() => setShowResults(false), 200)}
             className="block h-full w-full rounded-full bg-lightPrimary text-sm font-medium text-navy-700 outline-none placeholder:!text-gray-400 dark:bg-navy-900 dark:text-white dark:placeholder:!text-white sm:w-fit"
           />
+          {showResults && (
+            <div className="absolute left-0 top-[110%] z-50 w-[320px] rounded-xl bg-white p-3 shadow-xl dark:bg-navy-700">
+              {totalResultados === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-300">
+                  Nenhum resultado encontrado.
+                </p>
+              )}
+              {searchResults.properties?.length > 0 && (
+                <div className="mb-2">
+                  <p className="mb-1 text-xs font-bold uppercase text-gray-400">
+                    Imóveis
+                  </p>
+                  {searchResults.properties.map((p: any) => (
+                    <div
+                      key={p.id}
+                      className="cursor-pointer rounded-lg p-2 text-sm text-navy-700 hover:bg-lightPrimary dark:text-white dark:hover:bg-navy-900"
+                      onClick={() => navigate("/admin/properties")}
+                    >
+                      {p.address}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {searchResults.owners?.length > 0 && (
+                <div className="mb-2">
+                  <p className="mb-1 text-xs font-bold uppercase text-gray-400">
+                    Proprietários
+                  </p>
+                  {searchResults.owners.map((o: any) => (
+                    <div
+                      key={o.id}
+                      className="cursor-pointer rounded-lg p-2 text-sm text-navy-700 hover:bg-lightPrimary dark:text-white dark:hover:bg-navy-900"
+                      onClick={() => navigate("/admin/owners")}
+                    >
+                      {o.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {searchResults.tenants?.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-bold uppercase text-gray-400">
+                    Inquilinos
+                  </p>
+                  {searchResults.tenants.map((t: any) => (
+                    <div
+                      key={t.id}
+                      className="cursor-pointer rounded-lg p-2 text-sm text-navy-700 hover:bg-lightPrimary dark:text-white dark:hover:bg-navy-900"
+                      onClick={() => navigate("/admin/tenants")}
+                    >
+                      {t.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <span
           className="flex cursor-pointer text-xl text-gray-600 dark:text-white xl:hidden"
@@ -154,7 +234,18 @@ const Navbar = (props: {
           classNames={"py-2 top-4 -left-[230px] md:-left-[440px] w-max"}
         />
 
-        <div className="cursor-pointer text-gray-600" onClick={alternarTema}>
+        <div
+          className="cursor-pointer text-gray-600"
+          onClick={() => {
+            if (darkmode) {
+              document.body.classList.remove("dark");
+              setDarkmode(false);
+            } else {
+              document.body.classList.add("dark");
+              setDarkmode(true);
+            }
+          }}
+        >
           {darkmode ? (
             <RiSunFill className="h-4 w-4 text-gray-600 dark:text-white" />
           ) : (
@@ -177,18 +268,24 @@ const Navbar = (props: {
                   </p>
                 </div>
               </div>
-              <div className="mt-3 h-px w-full bg-gray-200 dark:bg-white/20 " />
+              <div className="mt-3 h-px w-full bg-gray-200 dark:bg-white/20" />
               <div className="ml-4 mt-3 flex flex-col">
                 <a
                   href=" "
-                  onClick={irParaProfile}
+                  onClick={(e: any) => {
+                    e.preventDefault();
+                    navigate("/admin/profile");
+                  }}
                   className="cursor-pointer text-sm text-gray-800 dark:text-white hover:dark:text-white"
                 >
                   Profile Settings
                 </a>
                 <a
                   href=" "
-                  onClick={sair}
+                  onClick={(e: any) => {
+                    e.preventDefault();
+                    handleLogout();
+                  }}
                   className="mt-3 cursor-pointer text-sm font-medium text-red-500 hover:text-red-500"
                 >
                   Log Out
