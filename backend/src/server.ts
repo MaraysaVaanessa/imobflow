@@ -7,6 +7,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import jwt from "jsonwebtoken";
 import cors from "cors";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
@@ -15,6 +18,25 @@ const PORT = 3333;
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
+
+// Cria a pasta de uploads se não existir
+const uploadsDir = path.join(__dirname, "..", "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Serve os arquivos de upload publicamente (para exibir as fotos no frontend)
+app.use("/uploads", express.static(uploadsDir));
+
+// Configuração do multer: define onde e com que nome salvar o arquivo
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const nomeUnico = `${Date.now()}-${file.originalname}`;
+    cb(null, nomeUnico);
+  },
+});
+const upload = multer({ storage });
 
 app.use(cors());
 app.use(express.json());
@@ -136,33 +158,50 @@ app.get("/stats", autenticar, async (req, res) => {
 // ===== IMÓVEIS =====
 
 app.post("/properties", autenticar, async (req, res) => {
-  const { address, type, rentValue, bedrooms, bathrooms } = req.body;
+  try {
+    const { address, type, rentValue, bedrooms, bathrooms, photoUrl } =
+      req.body;
 
-  const property = await prisma.property.create({
-    data: { address, type, rentValue, bedrooms, bathrooms },
-  });
+    const property = await prisma.property.create({
+      data: { address, type, rentValue, bedrooms, bathrooms, photoUrl },
+    });
 
-  res.status(201).json(property);
+    res.status(201).json(property);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/properties", autenticar, async (req, res) => {
-  const properties = await prisma.property.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    const properties = await prisma.property.findMany({
+      orderBy: { createdAt: "desc" },
+    });
 
-  res.json(properties);
+    res.json(properties);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.put("/properties/:id", autenticar, async (req, res) => {
-  const { id } = req.params;
-  const { address, type, rentValue, bedrooms, bathrooms, status } = req.body;
+  try {
+    const { id } = req.params;
+    const { address, type, rentValue, bedrooms, bathrooms, status, photoUrl } =
+      req.body;
 
-  const property = await prisma.property.update({
-    where: { id: Number(id) },
-    data: { address, type, rentValue, bedrooms, bathrooms, status },
-  });
+    const property = await prisma.property.update({
+      where: { id: Number(id) },
+      data: { address, type, rentValue, bedrooms, bathrooms, status, photoUrl },
+    });
 
-  res.json(property);
+    res.json(property);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete("/properties/:id", autenticar, async (req, res) => {
@@ -176,10 +215,10 @@ app.delete("/properties/:id", autenticar, async (req, res) => {
 // ===== PROPRIETÁRIOS =====
 
 app.post("/owners", autenticar, async (req, res) => {
-  const { name, phone, email, cpf, address } = req.body;
+  const { name, phone, email, cpf, address, photoUrl } = req.body;
 
   const owner = await prisma.owner.create({
-    data: { name, phone, email, cpf, address },
+    data: { name, phone, email, cpf, address, photoUrl },
   });
 
   res.status(201).json(owner);
@@ -195,11 +234,11 @@ app.get("/owners", autenticar, async (req, res) => {
 
 app.put("/owners/:id", autenticar, async (req, res) => {
   const { id } = req.params;
-  const { name, phone, email, cpf, address } = req.body;
+  const { name, phone, email, cpf, address, photoUrl } = req.body;
 
   const owner = await prisma.owner.update({
     where: { id: Number(id) },
-    data: { name, phone, email, cpf, address },
+    data: { name, phone, email, cpf, address, photoUrl },
   });
 
   res.json(owner);
@@ -421,13 +460,14 @@ app.delete("/payments/:id", autenticar, async (req, res) => {
 // ===== MANUTENÇÕES =====
 
 app.post("/maintenances", autenticar, async (req, res) => {
-  const { description, estimatedCost, propertyId } = req.body;
+  const { description, estimatedCost, propertyId, photoUrl } = req.body;
 
   const maintenance = await prisma.maintenance.create({
     data: {
       description,
       estimatedCost,
       propertyId,
+      photoUrl,
     },
   });
 
@@ -447,11 +487,11 @@ app.get("/maintenances", autenticar, async (req, res) => {
 
 app.put("/maintenances/:id", autenticar, async (req, res) => {
   const { id } = req.params;
-  const { description, estimatedCost, status } = req.body;
+  const { description, estimatedCost, status, photoUrl } = req.body;
 
   const maintenance = await prisma.maintenance.update({
     where: { id: Number(id) },
-    data: { description, estimatedCost, status },
+    data: { description, estimatedCost, status, photoUrl },
   });
 
   res.json(maintenance);
@@ -553,31 +593,6 @@ app.get("/reports/financial", autenticar, async (req, res) => {
   });
 });
 
-app.get("/search", autenticar, async (req, res) => {
-  const query = String(req.query.q || "");
-
-  if (!query.trim()) {
-    return res.json({ properties: [], owners: [], tenants: [] });
-  }
-
-  const properties = await prisma.property.findMany({
-    where: { address: { contains: query, mode: "insensitive" } },
-    take: 5,
-  });
-
-  const owners = await prisma.owner.findMany({
-    where: { name: { contains: query, mode: "insensitive" } },
-    take: 5,
-  });
-
-  const tenants = await prisma.tenant.findMany({
-    where: { name: { contains: query, mode: "insensitive" } },
-    take: 5,
-  });
-
-  res.json({ properties, owners, tenants });
-});
-
 // Imóveis por status
 app.get("/reports/properties-status", autenticar, async (req, res) => {
   const disponiveis = await prisma.property.count({
@@ -614,6 +629,45 @@ app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
 
   res.json(contratos);
 });
+
+// ===== BUSCA =====
+
+app.get("/search", autenticar, async (req, res) => {
+  const query = String(req.query.q || "");
+
+  if (!query.trim()) {
+    return res.json({ properties: [], owners: [], tenants: [] });
+  }
+
+  const properties = await prisma.property.findMany({
+    where: { address: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  const owners = await prisma.owner.findMany({
+    where: { name: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  const tenants = await prisma.tenant.findMany({
+    where: { name: { contains: query, mode: "insensitive" } },
+    take: 5,
+  });
+
+  res.json({ properties, owners, tenants });
+});
+
+// ===== UPLOAD =====
+
+// Rota de upload de imagem — devolve a URL do arquivo salvo
+app.post("/upload", autenticar, upload.single("photo"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Nenhum arquivo enviado" });
+  }
+  const url = `http://localhost:3333/uploads/${req.file.filename}`;
+  res.json({ url });
+});
+
 // ===== NOTIFICAÇÕES =====
 
 app.get("/notifications", autenticar, async (req, res) => {

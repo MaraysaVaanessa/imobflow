@@ -30,6 +30,7 @@ model Property {
   bathrooms Int
   status String @default("disponivel")
   createdAt DateTime @default(now())
+  photoUrl String?
   contracts Contract[]
   maintenances Maintenance[]
   appointments Appointment[]
@@ -43,6 +44,7 @@ model Owner {
   cpf       String   @unique
   address   String
   createdAt DateTime @default(now())
+  photoUrl  String?
   contracts Contract[]
 }
 
@@ -99,6 +101,7 @@ model Maintenance {
   openedAt       DateTime  @default(now())
   estimatedCost  Decimal
   resolvedAt     DateTime?
+  photoUrl       String?
 
   propertyId     Int
   property       Property  @relation(fields: [propertyId], references: [id])

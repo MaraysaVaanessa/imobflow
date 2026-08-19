@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PhotoUpload from "components/photoUpload/PhotoUpload";
 
 const API_URL = "http://localhost:3333/properties";
 
@@ -10,6 +11,7 @@ const Properties = () => {
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
   const [status, setStatus] = useState("disponivel");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
 
@@ -38,6 +40,7 @@ const Properties = () => {
     setBedrooms("");
     setBathrooms("");
     setStatus("disponivel");
+    setPhotoUrl("");
     setEditingId(null);
   };
 
@@ -60,6 +63,7 @@ const Properties = () => {
           bedrooms: Number(bedrooms),
           bathrooms: Number(bathrooms),
           status,
+          photoUrl,
         }),
       });
 
@@ -83,6 +87,7 @@ const Properties = () => {
     setBedrooms(String(property.bedrooms));
     setBathrooms(String(property.bathrooms));
     setStatus(property.status);
+    setPhotoUrl(property.photoUrl || "");
   };
 
   const handleExcluir = async (id: number) => {
@@ -108,6 +113,13 @@ const Properties = () => {
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           {editingId ? "Editar imóvel" : "Cadastrar novo imóvel"}
         </h2>
+
+        <div className="mb-4">
+          <PhotoUpload
+            photoUrl={photoUrl}
+            onUploaded={(url) => setPhotoUrl(url)}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <input
@@ -196,15 +208,24 @@ const Properties = () => {
               key={property.id}
               className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
             >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {property.address} — {property.type}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  R$ {Number(property.rentValue).toFixed(2)} •{" "}
-                  {property.bedrooms} quartos • {property.bathrooms} banheiros •{" "}
-                  {property.status}
-                </p>
+              <div className="flex items-center gap-3">
+                {property.photoUrl && (
+                  <img
+                    src={property.photoUrl}
+                    alt={property.address}
+                    className="h-14 w-14 rounded-lg object-cover"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {property.address} — {property.type}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    R$ {Number(property.rentValue).toFixed(2)} •{" "}
+                    {property.bedrooms} quartos • {property.bathrooms} banheiros
+                    • {property.status}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
