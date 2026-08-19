@@ -6,6 +6,9 @@ import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import jwt from "jsonwebtoken";
 import cors from "cors";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
 const app = express();
 const PORT = 3333;
@@ -641,6 +644,57 @@ app.get("/notifications", autenticar, async (req, res) => {
   });
 
   res.json(notificacoes);
+});
+
+// ===== ASSISTENTE IA =====
+
+app.post("/ai/ask", autenticar, async (req, res) => {
+  const { question } = req.body;
+
+  try {
+    // 1. RETRIEVAL: busca os dados reais do sistema
+    const [imoveis, contratos, pagamentos, manutencoes] = await Promise.all([
+      prisma.property.findMany(),
+      prisma.contract.findMany({
+        include: { property: true, tenant: true },
+      }),
+      prisma.payment.findMany({
+        include: { contract: { include: { property: true } } },
+      }),
+      prisma.maintenance.findMany({ include: { property: true } }),
+    ]);
+
+    const contexto = {
+      imoveis,
+      contratos,
+      pagamentos,
+      manutencoes,
+    };
+
+    // 2. GENERATION: manda os dados reais + pergunta pro Gemini
+    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+
+    const prompt = `
+Você é um assistente do sistema ImobFlow, de gestão imobiliária.
+Responda a pergunta do usuário APENAS com base nos dados JSON abaixo.
+Nunca invente números ou informações que não estejam nos dados.
+Responda em português, de forma clara e direta.
+
+DADOS DO SISTEMA:
+${JSON.stringify(contexto)}
+
+PERGUNTA DO USUÁRIO:
+${question}
+`;
+
+    const result = await model.generateContent(prompt);
+    const resposta = result.response.text();
+
+    res.json({ resposta });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro ao processar pergunta" });
+  }
 });
 
 app.listen(PORT, () => {
