@@ -586,6 +586,62 @@ app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
 
   res.json(contratos);
 });
+// ===== NOTIFICAÇÕES =====
+
+app.get("/notifications", autenticar, async (req, res) => {
+  const hoje = new Date();
+  const em7Dias = new Date();
+  em7Dias.setDate(hoje.getDate() + 7);
+
+  const notificacoes: any[] = [];
+
+  // Contratos vencendo em 7 dias
+  const contratosVencendo = await prisma.contract.findMany({
+    where: {
+      status: "ativo",
+      endDate: { gte: hoje, lte: em7Dias },
+    },
+    include: { property: true },
+  });
+
+  contratosVencendo.forEach((contrato) => {
+    notificacoes.push({
+      tipo: "contrato_vencendo",
+      mensagem: `Contrato do imóvel "${contrato.property.address}" vence em breve`,
+    });
+  });
+
+  // Pagamentos atrasados
+  const pagamentosAtrasados = await prisma.payment.findMany({
+    where: {
+      status: "pendente",
+      dueDate: { lt: hoje },
+    },
+    include: { contract: { include: { property: true } } },
+  });
+
+  pagamentosAtrasados.forEach((pagamento) => {
+    notificacoes.push({
+      tipo: "pagamento_atrasado",
+      mensagem: `Pagamento do imóvel "${pagamento.contract.property.address}" está atrasado`,
+    });
+  });
+
+  // Manutenções pendentes
+  const manutencoesPendentes = await prisma.maintenance.findMany({
+    where: { status: "pendente" },
+    include: { property: true },
+  });
+
+  manutencoesPendentes.forEach((manutencao) => {
+    notificacoes.push({
+      tipo: "manutencao_pendente",
+      mensagem: `Manutenção pendente no imóvel "${manutencao.property.address}": ${manutencao.description}`,
+    });
+  });
+
+  res.json(notificacoes);
+});
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
