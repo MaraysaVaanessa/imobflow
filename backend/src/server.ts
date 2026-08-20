@@ -630,6 +630,60 @@ app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
   res.json(contratos);
 });
 
+// Pagamentos pendentes, ordenados pelo vencimento mais próximo
+app.get("/reports/pending-payments", autenticar, async (req, res) => {
+  const pagamentos = await prisma.payment.findMany({
+    where: { status: "pendente" },
+    orderBy: { dueDate: "asc" },
+    take: 5,
+    include: {
+      contract: {
+        include: {
+          property: true,
+          tenant: true,
+        },
+      },
+    },
+  });
+
+  res.json(pagamentos);
+});
+
+// Receita dos últimos 7 dias (pagamentos recebidos, agrupados por dia)
+app.get("/reports/weekly-revenue", autenticar, async (req, res) => {
+  const hoje = new Date();
+  const seteDiasAtras = new Date();
+  seteDiasAtras.setDate(hoje.getDate() - 6);
+  seteDiasAtras.setHours(0, 0, 0, 0);
+
+  const pagamentos = await prisma.payment.findMany({
+    where: {
+      status: "pago",
+      paidAt: { gte: seteDiasAtras },
+    },
+  });
+
+  const categorias: string[] = [];
+  const valores: number[] = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const dia = new Date();
+    dia.setDate(hoje.getDate() - i);
+    const diaStr = dia.toISOString().slice(0, 10);
+
+    const totalDia = pagamentos
+      .filter((p) => p.paidAt && p.paidAt.toISOString().slice(0, 10) === diaStr)
+      .reduce((soma, p) => soma + Number(p.value), 0);
+
+    categorias.push(
+      dia.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    );
+    valores.push(totalDia);
+  }
+
+  res.json({ categorias, valores });
+});
+
 // ===== BUSCA =====
 
 app.get("/search", autenticar, async (req, res) => {

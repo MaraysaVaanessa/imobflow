@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import WeeklyRevenue from "views/admin/default/components/WeeklyRevenue";
+import ExpiringContracts from "views/admin/default/components/ExpiringContracts";
+import PendingPayments from "views/admin/default/components/PendingPayments";
 
 import { MdBarChart, MdDashboard } from "react-icons/md";
 
 import Widget from "components/widget/Widget";
-import CheckTable from "views/admin/default/components/CheckTable";
-
-import tableDataCheck from "./variables/tableDataCheck";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -95,8 +94,9 @@ const Dashboard = () => {
 
       {/* Tables */}
 
-      <div className="mt-5 grid grid-cols-1 gap-5">
-        <CheckTable tableData={tableDataCheck} />
+      <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+        <ExpiringContracts />
+        <PendingPayments />
       </div>
     </div>
   );
