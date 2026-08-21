@@ -140,8 +140,55 @@ function somenteAdmin(
 }
 
 // Rota de teste protegida
+// Rota de teste protegida
 app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
+});
+
+// Busca os dados completos do usuário logado (para a tela de Profile)
+app.get("/me/profile", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const user = await prisma.user.findUnique({
+    where: { id: usuario.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      photoUrl: true,
+    },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "Usuário não encontrado" });
+  }
+
+  res.json(user);
+});
+
+// Atualiza nome e foto do usuário logado
+app.put("/me/profile", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { name, photoUrl } = req.body;
+
+  if (!name || name.trim() === "") {
+    return res.status(400).json({ error: "Informe o nome" });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: usuario.id },
+    data: { name, photoUrl },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      photoUrl: true,
+    },
+  });
+
+  res.json(user);
 });
 
 // Rota de estatísticas do dashboard
