@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PhotoUpload from "components/photoUpload/PhotoUpload";
 import { isAdmin } from "utils/auth";
+import { campoVazio, validarEmail, validarCPF } from "utils/validation";
 
 const API_URL = "http://localhost:3333/owners";
 
@@ -14,6 +15,7 @@ const Owners = () => {
   const [photoUrl, setPhotoUrl] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const admin = isAdmin();
@@ -44,8 +46,28 @@ const Owners = () => {
     setEditingId(null);
   };
 
+  const validarFormulario = () => {
+    if (campoVazio(name)) return "Informe o nome do proprietário";
+    if (campoVazio(phone)) return "Informe o telefone";
+    if (campoVazio(email)) return "Informe o email";
+    if (!validarEmail(email))
+      return "Informe um email válido (ex: nome@exemplo.com)";
+    if (campoVazio(cpf)) return "Informe o CPF";
+    if (!validarCPF(cpf)) return "O CPF deve ter 11 dígitos";
+    if (campoVazio(address)) return "Informe o endereço";
+    return "";
+  };
+
   const handleSalvar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const url = editingId ? `${API_URL}/${editingId}` : API_URL;
       const method = editingId ? "PUT" : "POST";
@@ -64,14 +86,23 @@ const Owners = () => {
         return;
       }
 
+      setSucesso(
+        editingId
+          ? "Proprietário atualizado com sucesso!"
+          : "Proprietário cadastrado com sucesso!"
+      );
       limparFormulario();
       buscarProprietarios();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
   };
 
   const handleEditar = (owner: any) => {
+    setSucesso("");
+    setErro("");
     setEditingId(owner.id);
     setName(owner.name);
     setPhone(owner.phone);
@@ -124,7 +155,7 @@ const Owners = () => {
             type="text"
             placeholder="Telefone"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
             className="rounded-lg border p-2 dark:bg-navy-900 dark:text-white"
           />
           <input
@@ -138,7 +169,8 @@ const Owners = () => {
             type="text"
             placeholder="CPF"
             value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
+            onChange={(e) => setCpf(e.target.value.replace(/\D/g, ""))}
+            maxLength={11}
             className="rounded-lg border p-2 dark:bg-navy-900 dark:text-white"
           />
           <input
@@ -151,6 +183,7 @@ const Owners = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <div className="mt-4 flex gap-3">
           <button

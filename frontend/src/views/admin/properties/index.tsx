@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PhotoUpload from "components/photoUpload/PhotoUpload";
 import { isAdmin } from "utils/auth";
+import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333/properties";
 
@@ -15,6 +16,7 @@ const Properties = () => {
   const [photoUrl, setPhotoUrl] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const admin = isAdmin();
@@ -46,8 +48,28 @@ const Properties = () => {
     setEditingId(null);
   };
 
+  const validarFormulario = () => {
+    if (campoVazio(address)) return "Informe o endereço do imóvel";
+    if (campoVazio(type)) return "Informe o tipo do imóvel";
+    if (campoVazio(rentValue) || Number(rentValue) <= 0)
+      return "Informe um valor de aluguel válido";
+    if (campoVazio(bedrooms) || Number(bedrooms) < 0)
+      return "Informe a quantidade de quartos";
+    if (campoVazio(bathrooms) || Number(bathrooms) < 0)
+      return "Informe a quantidade de banheiros";
+    return "";
+  };
+
   const handleSalvar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const url = editingId ? `${API_URL}/${editingId}` : API_URL;
       const method = editingId ? "PUT" : "POST";
@@ -74,14 +96,23 @@ const Properties = () => {
         return;
       }
 
+      setSucesso(
+        editingId
+          ? "Imóvel atualizado com sucesso!"
+          : "Imóvel cadastrado com sucesso!"
+      );
       limparFormulario();
       buscarImoveis();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
   };
 
   const handleEditar = (property: any) => {
+    setSucesso("");
+    setErro("");
     setEditingId(property.id);
     setAddress(property.address);
     setType(property.type);
@@ -172,6 +203,7 @@ const Properties = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <div className="mt-4 flex gap-3">
           <button
