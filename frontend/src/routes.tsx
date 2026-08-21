@@ -1,7 +1,6 @@
 import React from "react";
 
 // Admin Imports
-// Admin Imports
 import MainDashboard from "views/admin/default";
 import Properties from "views/admin/properties";
 import Tenants from "views/admin/tenants";
@@ -13,6 +12,7 @@ import Maintenances from "views/admin/maintenances";
 import Appointments from "views/admin/appointments";
 import Assistant from "views/admin/assistant";
 import Reports from "views/admin/reports";
+import UserManagement from "views/admin/users";
 // Auth Imports
 import SignIn from "views/auth/SignIn";
 
@@ -29,6 +29,7 @@ import {
   MdEvent,
   MdAssessment,
   MdSmartToy,
+  MdManageAccounts,
 } from "react-icons/md";
 const routes = [
   {
@@ -104,6 +105,13 @@ const routes = [
     path: "assistant",
     icon: <MdSmartToy className="h-6 w-6" />,
     component: <Assistant />,
+  },
+  {
+    name: "Usuários",
+    layout: "/admin",
+    path: "users",
+    icon: <MdManageAccounts className="h-6 w-6" />,
+    component: <UserManagement />,
   },
   {
     name: "Profile",
