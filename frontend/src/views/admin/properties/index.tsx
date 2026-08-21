@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PhotoUpload from "components/photoUpload/PhotoUpload";
+import { isAdmin } from "utils/auth";
 
 const API_URL = "http://localhost:3333/properties";
 
@@ -16,6 +17,7 @@ const Properties = () => {
   const [erro, setErro] = useState("");
 
   const token = localStorage.getItem("token");
+  const admin = isAdmin();
 
   const buscarImoveis = async () => {
     try {
@@ -234,12 +236,14 @@ const Properties = () => {
                 >
                   Editar
                 </button>
-                <button
-                  onClick={() => handleExcluir(property.id)}
-                  className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                >
-                  Excluir
-                </button>
+                {admin && (
+                  <button
+                    onClick={() => handleExcluir(property.id)}
+                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -124,6 +124,21 @@ function autenticar(
   }
 }
 
+// Middleware: confere se o usuário logado é administrador
+function somenteAdmin(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const usuario = (req as any).usuario;
+  if (usuario?.role !== "admin") {
+    return res
+      .status(403)
+      .json({ error: "Ação permitida apenas para administradores" });
+  }
+  next();
+}
+
 // Rota de teste protegida
 app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
@@ -153,6 +168,40 @@ app.get("/stats", autenticar, async (req, res) => {
     inquilinos: totalInquilinos,
     manutencoesPendentes,
   });
+});
+
+// ===== USUÁRIOS (apenas admin) =====
+
+app.get("/users", autenticar, somenteAdmin, async (req, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(users);
+});
+
+app.put("/users/:id/role", autenticar, somenteAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  if (role !== "admin" && role !== "operador") {
+    return res.status(400).json({ error: "Role inválida" });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: Number(id) },
+    data: { role },
+    select: { id: true, name: true, email: true, role: true },
+  });
+
+  res.json(user);
 });
 
 // ===== IMÓVEIS =====
@@ -204,7 +253,7 @@ app.put("/properties/:id", autenticar, async (req, res) => {
   }
 });
 
-app.delete("/properties/:id", autenticar, async (req, res) => {
+app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.property.delete({ where: { id: Number(id) } });
@@ -244,7 +293,7 @@ app.put("/owners/:id", autenticar, async (req, res) => {
   res.json(owner);
 });
 
-app.delete("/owners/:id", autenticar, async (req, res) => {
+app.delete("/owners/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.owner.delete({ where: { id: Number(id) } });
@@ -316,7 +365,7 @@ app.put("/tenants/:id", autenticar, async (req, res) => {
   res.json(tenant);
 });
 
-app.delete("/tenants/:id", autenticar, async (req, res) => {
+app.delete("/tenants/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.tenant.delete({ where: { id: Number(id) } });
@@ -395,7 +444,7 @@ app.put("/contracts/:id", autenticar, async (req, res) => {
   res.json(contract);
 });
 
-app.delete("/contracts/:id", autenticar, async (req, res) => {
+app.delete("/contracts/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.contract.delete({ where: { id: Number(id) } });
@@ -449,7 +498,7 @@ app.put("/payments/:id/pagar", autenticar, async (req, res) => {
   res.json(payment);
 });
 
-app.delete("/payments/:id", autenticar, async (req, res) => {
+app.delete("/payments/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.payment.delete({ where: { id: Number(id) } });
@@ -511,7 +560,7 @@ app.put("/maintenances/:id/concluir", autenticar, async (req, res) => {
   res.json(maintenance);
 });
 
-app.delete("/maintenances/:id", autenticar, async (req, res) => {
+app.delete("/maintenances/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.maintenance.delete({ where: { id: Number(id) } });
@@ -565,7 +614,7 @@ app.put("/appointments/:id", autenticar, async (req, res) => {
   res.json(appointment);
 });
 
-app.delete("/appointments/:id", autenticar, async (req, res) => {
+app.delete("/appointments/:id", autenticar, somenteAdmin, async (req, res) => {
   const { id } = req.params;
 
   await prisma.appointment.delete({ where: { id: Number(id) } });

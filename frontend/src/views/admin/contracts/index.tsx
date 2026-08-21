@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAdmin } from "utils/auth";
 
 const API_URL = "http://localhost:3333";
 
@@ -21,6 +22,7 @@ const Contracts = () => {
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
+  const admin = isAdmin();
 
   const buscarTudo = async () => {
     try {
@@ -283,12 +285,14 @@ const Contracts = () => {
                 >
                   Editar
                 </button>
-                <button
-                  onClick={() => handleExcluir(contract.id)}
-                  className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                >
-                  Excluir
-                </button>
+                {admin && (
+                  <button
+                    onClick={() => handleExcluir(contract.id)}
+                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
             </div>
           ))}

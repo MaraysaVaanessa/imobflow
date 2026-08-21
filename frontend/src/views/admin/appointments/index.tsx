@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAdmin } from "utils/auth";
 
 const API_URL = "http://localhost:3333";
 
@@ -14,6 +15,7 @@ const Appointments = () => {
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
+  const admin = isAdmin();
 
   const buscarTudo = async () => {
     try {
@@ -169,12 +171,14 @@ const Appointments = () => {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => handleExcluir(appointment.id)}
-                className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-              >
-                Excluir
-              </button>
+              {admin && (
+                <button
+                  onClick={() => handleExcluir(appointment.id)}
+                  className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                >
+                  Excluir
+                </button>
+              )}
             </div>
           ))}
         </div>
