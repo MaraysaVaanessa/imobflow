@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAdmin } from "utils/auth";
+import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333";
 
@@ -11,6 +12,7 @@ const Payments = () => {
   const [dueDate, setDueDate] = useState("");
   const [value, setValue] = useState("");
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -34,8 +36,24 @@ const Payments = () => {
     buscarTudo();
   }, []);
 
+  const validarFormulario = () => {
+    if (campoVazio(contractId)) return "Selecione o contrato";
+    if (campoVazio(dueDate)) return "Informe a data de vencimento";
+    if (campoVazio(value) || Number(value) <= 0)
+      return "Informe um valor válido";
+    return "";
+  };
+
   const handleCadastrar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/payments`, {
         method: "POST",
@@ -55,10 +73,13 @@ const Payments = () => {
         return;
       }
 
+      setSucesso("Pagamento registrado com sucesso!");
       setContractId("");
       setDueDate("");
       setValue("");
       buscarTudo();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
@@ -70,7 +91,9 @@ const Payments = () => {
         method: "PUT",
         headers,
       });
+      setSucesso("Pagamento marcado como pago!");
       buscarTudo();
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível marcar como pago");
     }
@@ -131,6 +154,7 @@ const Payments = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <button
           onClick={handleCadastrar}

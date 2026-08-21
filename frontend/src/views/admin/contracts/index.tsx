@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAdmin } from "utils/auth";
+import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333";
 
@@ -19,6 +20,7 @@ const Contracts = () => {
   const [status, setStatus] = useState("ativo");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -59,8 +61,29 @@ const Contracts = () => {
     setEditingId(null);
   };
 
+  const validarFormulario = () => {
+    if (campoVazio(propertyId)) return "Selecione o imóvel";
+    if (campoVazio(ownerId)) return "Selecione o proprietário";
+    if (campoVazio(tenantId)) return "Selecione o inquilino";
+    if (campoVazio(startDate)) return "Informe a data de início";
+    if (campoVazio(endDate)) return "Informe a data de término";
+    if (campoVazio(rentValue) || Number(rentValue) <= 0)
+      return "Informe um valor de aluguel válido";
+    if (campoVazio(dueDay) || Number(dueDay) < 1 || Number(dueDay) > 31)
+      return "Informe um dia de vencimento entre 1 e 31";
+    return "";
+  };
+
   const handleSalvar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const url = editingId
         ? `${API_URL}/contracts/${editingId}`
@@ -90,14 +113,23 @@ const Contracts = () => {
         return;
       }
 
+      setSucesso(
+        editingId
+          ? "Contrato atualizado com sucesso!"
+          : "Contrato cadastrado com sucesso!"
+      );
       limparFormulario();
       buscarTudo();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
   };
 
   const handleEditar = (contract: any) => {
+    setSucesso("");
+    setErro("");
     setEditingId(contract.id);
     setPropertyId(String(contract.propertyId));
     setOwnerId(String(contract.ownerId));
@@ -226,6 +258,7 @@ const Contracts = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <div className="mt-4 flex gap-3">
           <button

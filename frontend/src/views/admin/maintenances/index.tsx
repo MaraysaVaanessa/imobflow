@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAdmin } from "utils/auth";
+import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333";
 
@@ -11,6 +12,7 @@ const Maintenances = () => {
   const [description, setDescription] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -34,8 +36,24 @@ const Maintenances = () => {
     buscarTudo();
   }, []);
 
+  const validarFormulario = () => {
+    if (campoVazio(propertyId)) return "Selecione o imóvel";
+    if (campoVazio(description)) return "Informe a descrição do problema";
+    if (campoVazio(estimatedCost) || Number(estimatedCost) < 0)
+      return "Informe um custo estimado válido";
+    return "";
+  };
+
   const handleCadastrar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/maintenances`, {
         method: "POST",
@@ -55,10 +73,13 @@ const Maintenances = () => {
         return;
       }
 
+      setSucesso("Manutenção registrada com sucesso!");
       setPropertyId("");
       setDescription("");
       setEstimatedCost("");
       buscarTudo();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
@@ -70,7 +91,9 @@ const Maintenances = () => {
         method: "PUT",
         headers,
       });
+      setSucesso("Manutenção concluída!");
       buscarTudo();
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível concluir a manutenção");
     }
@@ -132,6 +155,7 @@ const Maintenances = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <button
           onClick={handleCadastrar}

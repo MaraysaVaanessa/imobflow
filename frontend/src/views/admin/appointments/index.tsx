@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAdmin } from "utils/auth";
+import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333";
 
@@ -12,6 +13,7 @@ const Appointments = () => {
   const [date, setDate] = useState("");
   const [propertyId, setPropertyId] = useState("");
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -35,8 +37,22 @@ const Appointments = () => {
     buscarTudo();
   }, []);
 
+  const validarFormulario = () => {
+    if (campoVazio(title)) return "Informe o título do compromisso";
+    if (campoVazio(date)) return "Informe a data e hora";
+    return "";
+  };
+
   const handleCadastrar = async () => {
     setErro("");
+    setSucesso("");
+
+    const mensagemValidacao = validarFormulario();
+    if (mensagemValidacao) {
+      setErro(mensagemValidacao);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/appointments`, {
         method: "POST",
@@ -57,11 +73,14 @@ const Appointments = () => {
         return;
       }
 
+      setSucesso("Compromisso registrado com sucesso!");
       setTitle("");
       setDescription("");
       setDate("");
       setPropertyId("");
       buscarTudo();
+
+      setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
     }
@@ -130,6 +149,7 @@ const Appointments = () => {
         </div>
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
+        {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
 
         <button
           onClick={handleCadastrar}
