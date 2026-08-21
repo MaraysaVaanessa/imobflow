@@ -13,12 +13,15 @@ const Maintenances = () => {
   const [estimatedCost, setEstimatedCost] = useState("");
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
   const buscarTudo = async () => {
+    setCarregando(true);
     try {
       const [maintenancesRes, propertiesRes] = await Promise.all([
         fetch(`${API_URL}/maintenances`, { headers }),
@@ -29,6 +32,8 @@ const Maintenances = () => {
       setProperties(await propertiesRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -54,6 +59,7 @@ const Maintenances = () => {
       return;
     }
 
+    setSalvando(true);
     try {
       const response = await fetch(`${API_URL}/maintenances`, {
         method: "POST",
@@ -82,6 +88,8 @@ const Maintenances = () => {
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -159,9 +167,10 @@ const Maintenances = () => {
 
         <button
           onClick={handleCadastrar}
-          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
+          disabled={salvando}
+          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          Registrar
+          {salvando ? "Registrando..." : "Registrar"}
         </button>
       </div>
 
@@ -171,57 +180,59 @@ const Maintenances = () => {
           Manutenções registradas
         </h2>
 
-        {maintenances.length === 0 && (
+        {carregando ? (
+          <p className="text-gray-500 dark:text-gray-300">Carregando...</p>
+        ) : maintenances.length === 0 ? (
           <p className="text-gray-600 dark:text-gray-300">
             Nenhuma manutenção registrada ainda.
           </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {maintenances.map((maintenance) => (
+              <div
+                key={maintenance.id}
+                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+              >
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {maintenance.property?.address}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {maintenance.description} • Custo estimado: R${" "}
+                    {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
+                    <span
+                      className={
+                        maintenance.status === "concluida"
+                          ? "font-medium text-green-600"
+                          : "font-medium text-orange-500"
+                      }
+                    >
+                      {maintenance.status}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {maintenance.status === "pendente" && (
+                    <button
+                      onClick={() => handleConcluir(maintenance.id)}
+                      className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                    >
+                      Concluir
+                    </button>
+                  )}
+                  {admin && (
+                    <button
+                      onClick={() => handleExcluir(maintenance.id)}
+                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-
-        <div className="flex flex-col gap-3">
-          {maintenances.map((maintenance) => (
-            <div
-              key={maintenance.id}
-              className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-            >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {maintenance.property?.address}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {maintenance.description} • Custo estimado: R${" "}
-                  {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
-                  <span
-                    className={
-                      maintenance.status === "concluida"
-                        ? "font-medium text-green-600"
-                        : "font-medium text-orange-500"
-                    }
-                  >
-                    {maintenance.status}
-                  </span>
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {maintenance.status === "pendente" && (
-                  <button
-                    onClick={() => handleConcluir(maintenance.id)}
-                    className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                  >
-                    Concluir
-                  </button>
-                )}
-                {admin && (
-                  <button
-                    onClick={() => handleExcluir(maintenance.id)}
-                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                  >
-                    Excluir
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

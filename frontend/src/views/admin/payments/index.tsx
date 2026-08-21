@@ -13,12 +13,15 @@ const Payments = () => {
   const [value, setValue] = useState("");
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
   const buscarTudo = async () => {
+    setCarregando(true);
     try {
       const [paymentsRes, contractsRes] = await Promise.all([
         fetch(`${API_URL}/payments`, { headers }),
@@ -29,6 +32,8 @@ const Payments = () => {
       setContracts(await contractsRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -54,6 +59,7 @@ const Payments = () => {
       return;
     }
 
+    setSalvando(true);
     try {
       const response = await fetch(`${API_URL}/payments`, {
         method: "POST",
@@ -82,6 +88,8 @@ const Payments = () => {
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -158,9 +166,10 @@ const Payments = () => {
 
         <button
           onClick={handleCadastrar}
-          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
+          disabled={salvando}
+          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          Registrar
+          {salvando ? "Registrando..." : "Registrar"}
         </button>
       </div>
 
@@ -170,58 +179,60 @@ const Payments = () => {
           Pagamentos
         </h2>
 
-        {payments.length === 0 && (
+        {carregando ? (
+          <p className="text-gray-500 dark:text-gray-300">Carregando...</p>
+        ) : payments.length === 0 ? (
           <p className="text-gray-600 dark:text-gray-300">
             Nenhum pagamento registrado ainda.
           </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {payments.map((payment) => (
+              <div
+                key={payment.id}
+                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+              >
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {payment.contract?.property?.address} —{" "}
+                    {payment.contract?.tenant?.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Vencimento: {payment.dueDate.slice(0, 10)} • R${" "}
+                    {Number(payment.value).toFixed(2)} •{" "}
+                    <span
+                      className={
+                        payment.status === "pago"
+                          ? "font-medium text-green-600"
+                          : "font-medium text-orange-500"
+                      }
+                    >
+                      {payment.status}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {payment.status === "pendente" && (
+                    <button
+                      onClick={() => handleMarcarPago(payment.id)}
+                      className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                    >
+                      Marcar como pago
+                    </button>
+                  )}
+                  {admin && (
+                    <button
+                      onClick={() => handleExcluir(payment.id)}
+                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-
-        <div className="flex flex-col gap-3">
-          {payments.map((payment) => (
-            <div
-              key={payment.id}
-              className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-            >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {payment.contract?.property?.address} —{" "}
-                  {payment.contract?.tenant?.name}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Vencimento: {payment.dueDate.slice(0, 10)} • R${" "}
-                  {Number(payment.value).toFixed(2)} •{" "}
-                  <span
-                    className={
-                      payment.status === "pago"
-                        ? "font-medium text-green-600"
-                        : "font-medium text-orange-500"
-                    }
-                  >
-                    {payment.status}
-                  </span>
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {payment.status === "pendente" && (
-                  <button
-                    onClick={() => handleMarcarPago(payment.id)}
-                    className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                  >
-                    Marcar como pago
-                  </button>
-                )}
-                {admin && (
-                  <button
-                    onClick={() => handleExcluir(payment.id)}
-                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                  >
-                    Excluir
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

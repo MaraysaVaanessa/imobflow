@@ -14,12 +14,15 @@ const Appointments = () => {
   const [propertyId, setPropertyId] = useState("");
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
   const buscarTudo = async () => {
+    setCarregando(true);
     try {
       const [appointmentsRes, propertiesRes] = await Promise.all([
         fetch(`${API_URL}/appointments`, { headers }),
@@ -30,6 +33,8 @@ const Appointments = () => {
       setProperties(await propertiesRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -53,6 +58,7 @@ const Appointments = () => {
       return;
     }
 
+    setSalvando(true);
     try {
       const response = await fetch(`${API_URL}/appointments`, {
         method: "POST",
@@ -83,6 +89,8 @@ const Appointments = () => {
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -153,9 +161,10 @@ const Appointments = () => {
 
         <button
           onClick={handleCadastrar}
-          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
+          disabled={salvando}
+          className="mt-4 rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          Registrar
+          {salvando ? "Registrando..." : "Registrar"}
         </button>
       </div>
 
@@ -165,43 +174,46 @@ const Appointments = () => {
           Compromissos
         </h2>
 
-        {appointments.length === 0 && (
+        {carregando ? (
+          <p className="text-gray-500 dark:text-gray-300">Carregando...</p>
+        ) : appointments.length === 0 ? (
           <p className="text-gray-600 dark:text-gray-300">
             Nenhum compromisso registrado ainda.
           </p>
-        )}
-
-        <div className="flex flex-col gap-3">
-          {appointments.map((appointment) => (
-            <div
-              key={appointment.id}
-              className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-            >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {appointment.title}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {new Date(appointment.date).toLocaleString("pt-BR")}
-                  {appointment.property && ` • ${appointment.property.address}`}
-                </p>
-                {appointment.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {appointment.description}
+        ) : (
+          <div className="flex flex-col gap-3">
+            {appointments.map((appointment) => (
+              <div
+                key={appointment.id}
+                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+              >
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {appointment.title}
                   </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {new Date(appointment.date).toLocaleString("pt-BR")}
+                    {appointment.property &&
+                      ` • ${appointment.property.address}`}
+                  </p>
+                  {appointment.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {appointment.description}
+                    </p>
+                  )}
+                </div>
+                {admin && (
+                  <button
+                    onClick={() => handleExcluir(appointment.id)}
+                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                  >
+                    Excluir
+                  </button>
                 )}
               </div>
-              {admin && (
-                <button
-                  onClick={() => handleExcluir(appointment.id)}
-                  className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                >
-                  Excluir
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

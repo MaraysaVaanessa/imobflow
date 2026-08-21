@@ -21,12 +21,15 @@ const Contracts = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
   const buscarTudo = async () => {
+    setCarregando(true);
     try {
       const [contractsRes, propertiesRes, ownersRes, tenantsRes] =
         await Promise.all([
@@ -42,6 +45,8 @@ const Contracts = () => {
       setTenants(await tenantsRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -84,6 +89,7 @@ const Contracts = () => {
       return;
     }
 
+    setSalvando(true);
     try {
       const url = editingId
         ? `${API_URL}/contracts/${editingId}`
@@ -124,6 +130,8 @@ const Contracts = () => {
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -263,9 +271,14 @@ const Contracts = () => {
         <div className="mt-4 flex gap-3">
           <button
             onClick={handleSalvar}
-            className="rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600"
+            disabled={salvando}
+            className="rounded-xl bg-brand-500 px-5 py-2 font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
-            {editingId ? "Salvar alterações" : "Cadastrar"}
+            {salvando
+              ? "Salvando..."
+              : editingId
+              ? "Salvar alterações"
+              : "Cadastrar"}
           </button>
 
           {editingId && (
@@ -285,51 +298,53 @@ const Contracts = () => {
           Contratos cadastrados
         </h2>
 
-        {contracts.length === 0 && (
+        {carregando ? (
+          <p className="text-gray-500 dark:text-gray-300">Carregando...</p>
+        ) : contracts.length === 0 ? (
           <p className="text-gray-600 dark:text-gray-300">
             Nenhum contrato cadastrado ainda.
           </p>
-        )}
-
-        <div className="flex flex-col gap-3">
-          {contracts.map((contract) => (
-            <div
-              key={contract.id}
-              className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-            >
-              <div>
-                <p className="font-medium text-navy-700 dark:text-white">
-                  {contract.property?.address} — {contract.tenant?.name}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Proprietário: {contract.owner?.name} • R${" "}
-                  {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
-                  {contract.dueDay} • {contract.status}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {contract.startDate.slice(0, 10)} até{" "}
-                  {contract.endDate.slice(0, 10)}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditar(contract)}
-                  className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                >
-                  Editar
-                </button>
-                {admin && (
+        ) : (
+          <div className="flex flex-col gap-3">
+            {contracts.map((contract) => (
+              <div
+                key={contract.id}
+                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+              >
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {contract.property?.address} — {contract.tenant?.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Proprietário: {contract.owner?.name} • R${" "}
+                    {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
+                    {contract.dueDay} • {contract.status}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {contract.startDate.slice(0, 10)} até{" "}
+                    {contract.endDate.slice(0, 10)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
                   <button
-                    onClick={() => handleExcluir(contract.id)}
-                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                    onClick={() => handleEditar(contract)}
+                    className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
                   >
-                    Excluir
+                    Editar
                   </button>
-                )}
+                  {admin && (
+                    <button
+                      onClick={() => handleExcluir(contract.id)}
+                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
