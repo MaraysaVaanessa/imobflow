@@ -119,3 +119,12 @@ model Appointment {
   propertyId   Int?
   property     Property? @relation(fields: [propertyId], references: [id])
 }
+
+model SupportMessage {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  message   String
+  status    String   @default("aberto")
+  createdAt DateTime @default(now())
+}

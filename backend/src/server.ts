@@ -875,6 +875,32 @@ app.get("/notifications", autenticar, async (req, res) => {
   res.json(notificacoes);
 });
 
+// ===== SUPORTE =====
+
+// Rota pública: qualquer pessoa pode enviar uma mensagem de suporte
+app.post("/support", async (req, res) => {
+  const { name, email, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: "Preencha todos os campos" });
+  }
+
+  const supportMessage = await prisma.supportMessage.create({
+    data: { name, email, message },
+  });
+
+  res.status(201).json(supportMessage);
+});
+
+// Rota protegida: só admins veem as mensagens recebidas
+app.get("/support", autenticar, somenteAdmin, async (req, res) => {
+  const messages = await prisma.supportMessage.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(messages);
+});
+
 // ===== ASSISTENTE IA =====
 
 app.post("/ai/ask", autenticar, async (req, res) => {

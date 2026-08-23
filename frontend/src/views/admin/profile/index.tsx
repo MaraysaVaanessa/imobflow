@@ -29,6 +29,7 @@ const ProfileOverview = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
+      console.log("Dados do perfil recebidos:", data);
       setName(data.name);
       setEmail(data.email);
       setRole(data.role);

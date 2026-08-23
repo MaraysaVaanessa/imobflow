@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const Footer = () => {
   return (
     <div className="flex w-full flex-col items-center justify-between px-1 pb-8 pt-3 lg:px-8 xl:flex-row">
@@ -9,29 +11,28 @@ const Footer = () => {
       <div>
         <ul className="flex flex-wrap items-center gap-3 sm:flex-nowrap md:gap-10">
           <li>
-            <a
-              target="blank"
-              href="mailto:contato@imobflow.com"
+            <Link
+              to="/support"
               className="text-base font-medium text-gray-600 hover:text-gray-600"
             >
               Suporte
-            </a>
+            </Link>
           </li>
           <li>
-            <a
-              href="#"
+            <Link
+              to="/terms-of-use"
               className="text-base font-medium text-gray-600 hover:text-gray-600"
             >
               Termos de Uso
-            </a>
+            </Link>
           </li>
           <li>
-            <a
-              href="#"
+            <Link
+              to="/privacy-policy"
               className="text-base font-medium text-gray-600 hover:text-gray-600"
             >
               Privacidade
-            </a>
+            </Link>
           </li>
         </ul>
       </div>
