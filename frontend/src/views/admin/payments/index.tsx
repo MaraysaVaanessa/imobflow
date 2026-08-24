@@ -210,6 +210,13 @@ const Payments = () => {
                       {payment.status}
                     </span>
                   </p>
+                  {payment.diasAtraso > 0 && (
+                    <p className="text-sm font-medium text-red-500">
+                      Atrasado há {payment.diasAtraso} dia(s) • Valor atualizado
+                      (com multa e juros): R${" "}
+                      {Number(payment.valorAtualizado).toFixed(2)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   {payment.status === "pendente" && (

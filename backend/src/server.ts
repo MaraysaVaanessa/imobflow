@@ -19,7 +19,6 @@ const PORT = 3333;
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-// Cria a pasta de uploads se não existir
 const uploadsDir = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
@@ -45,7 +44,6 @@ app.get("/", (req, res) => {
 
 // ===== CADASTRO E LOGIN =====
 
-// Cadastro de uma empresa nova (cria a empresa + primeiro usuário, que já nasce admin)
 app.post("/signup", async (req, res) => {
   const { name, email, password, companyName } = req.body;
 
@@ -77,13 +75,11 @@ app.post("/signup", async (req, res) => {
   });
 });
 
-// Cadastro de rota antiga, mantida por compatibilidade com testes existentes
 app.post("/users", async (req, res) => {
   const { name, email, password } = req.body;
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Se não houver nenhuma empresa ainda, cria uma padrão
   let company = await prisma.company.findFirst();
   if (!company) {
     company = await prisma.company.create({
@@ -107,7 +103,6 @@ app.post("/users", async (req, res) => {
   });
 });
 
-// Rota de login
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -148,7 +143,6 @@ app.post("/login", async (req, res) => {
   });
 });
 
-// Middleware: confere se a requisição tem um token válido
 function autenticar(
   req: express.Request,
   res: express.Response,
@@ -171,7 +165,6 @@ function autenticar(
   }
 }
 
-// Middleware: confere se o usuário logado é administrador
 function somenteAdmin(
   req: express.Request,
   res: express.Response,
@@ -186,12 +179,10 @@ function somenteAdmin(
   next();
 }
 
-// Rota de teste protegida
 app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
 });
 
-// Busca os dados completos do usuário logado (para a tela de Profile)
 app.get("/me/profile", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
 
@@ -213,7 +204,6 @@ app.get("/me/profile", autenticar, async (req, res) => {
   res.json(user);
 });
 
-// Atualiza nome e foto do usuário logado
 app.put("/me/profile", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
   const { name, photoUrl } = req.body;
@@ -237,7 +227,6 @@ app.put("/me/profile", autenticar, async (req, res) => {
   res.json(user);
 });
 
-// Rota de estatísticas do dashboard
 app.get("/stats", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
   const companyId = usuario.companyId;
@@ -285,7 +274,6 @@ app.get("/users", autenticar, somenteAdmin, async (req, res) => {
   res.json(users);
 });
 
-// Admin adiciona um novo operador à própria empresa
 app.post("/users/team", autenticar, somenteAdmin, async (req, res) => {
   const usuario = (req as any).usuario;
   const { name, email, password } = req.body;
@@ -424,59 +412,6 @@ app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
   await prisma.property.delete({ where: { id: Number(id) } });
 
   res.status(204).send();
-});
-
-// Lista contratos elegíveis para reajuste (aniversário de 12 meses desde o inicio ou ultimo reajuste)
-app.get("/contracts/adjustable", autenticar, async (req, res) => {
-  const usuario = (req as any).usuario;
-
-  const contratos = await prisma.contract.findMany({
-    where: { companyId: usuario.companyId, status: "ativo" },
-    include: { property: true, tenant: true },
-  });
-
-  const hoje = new Date();
-
-  const elegiveis = contratos.filter((contrato) => {
-    const dataBase = contrato.lastAdjustmentDate ?? contrato.startDate;
-    const proximoReajuste = new Date(dataBase);
-    proximoReajuste.setFullYear(proximoReajuste.getFullYear() + 1);
-    return proximoReajuste <= hoje;
-  });
-
-  res.json(elegiveis);
-});
-
-// Aplica o reajuste: recalcula o valor do aluguel com base em um percentual informado
-app.put("/contracts/:id/adjust", autenticar, async (req, res) => {
-  const usuario = (req as any).usuario;
-  const { id } = req.params;
-  const { percentage } = req.body;
-
-  if (percentage === undefined || isNaN(Number(percentage))) {
-    return res.status(400).json({ error: "Informe um percentual válido" });
-  }
-
-  const existente = await prisma.contract.findFirst({
-    where: { id: Number(id), companyId: usuario.companyId },
-  });
-
-  if (!existente) {
-    return res.status(404).json({ error: "Contrato não encontrado" });
-  }
-
-  const novoValor =
-    Number(existente.rentValue) * (1 + Number(percentage) / 100);
-
-  const contract = await prisma.contract.update({
-    where: { id: Number(id) },
-    data: {
-      rentValue: novoValor,
-      lastAdjustmentDate: new Date(),
-    },
-  });
-
-  res.json(contract);
 });
 
 // ===== PROPRIETÁRIOS =====
@@ -671,6 +606,43 @@ app.post("/contracts", autenticar, async (req, res) => {
     },
   });
 
+  // Gera automaticamente um pagamento pendente para cada mês do contrato
+  const inicio = new Date(startDate);
+  const fim = new Date(endDate);
+  const pagamentosParaCriar: {
+    dueDate: Date;
+    value: number;
+    contractId: number;
+    companyId: number;
+  }[] = [];
+
+  let anoAtual = inicio.getFullYear();
+  let mesAtual = inicio.getMonth();
+
+  while (
+    anoAtual < fim.getFullYear() ||
+    (anoAtual === fim.getFullYear() && mesAtual <= fim.getMonth())
+  ) {
+    const ultimoDiaDoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+    const diaVencimento = Math.min(Number(dueDay), ultimoDiaDoMes);
+    const dataVencimento = new Date(anoAtual, mesAtual, diaVencimento);
+
+    pagamentosParaCriar.push({
+      dueDate: dataVencimento,
+      value: Number(rentValue),
+      contractId: contract.id,
+      companyId: usuario.companyId,
+    });
+
+    mesAtual++;
+    if (mesAtual > 11) {
+      mesAtual = 0;
+      anoAtual++;
+    }
+  }
+
+  await prisma.payment.createMany({ data: pagamentosParaCriar });
+
   res.status(201).json(contract);
 });
 
@@ -746,6 +718,59 @@ app.delete("/contracts/:id", autenticar, somenteAdmin, async (req, res) => {
   res.status(204).send();
 });
 
+// Lista contratos elegíveis para reajuste (aniversário de 12 meses desde o inicio ou ultimo reajuste)
+app.get("/contracts/adjustable", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const contratos = await prisma.contract.findMany({
+    where: { companyId: usuario.companyId, status: "ativo" },
+    include: { property: true, tenant: true },
+  });
+
+  const hoje = new Date();
+
+  const elegiveis = contratos.filter((contrato) => {
+    const dataBase = contrato.lastAdjustmentDate ?? contrato.startDate;
+    const proximoReajuste = new Date(dataBase);
+    proximoReajuste.setFullYear(proximoReajuste.getFullYear() + 1);
+    return proximoReajuste <= hoje;
+  });
+
+  res.json(elegiveis);
+});
+
+// Aplica o reajuste: recalcula o valor do aluguel com base em um percentual informado
+app.put("/contracts/:id/adjust", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+  const { percentage } = req.body;
+
+  if (percentage === undefined || isNaN(Number(percentage))) {
+    return res.status(400).json({ error: "Informe um percentual válido" });
+  }
+
+  const existente = await prisma.contract.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Contrato não encontrado" });
+  }
+
+  const novoValor =
+    Number(existente.rentValue) * (1 + Number(percentage) / 100);
+
+  const contract = await prisma.contract.update({
+    where: { id: Number(id) },
+    data: {
+      rentValue: novoValor,
+      lastAdjustmentDate: new Date(),
+    },
+  });
+
+  res.json(contract);
+});
+
 // ===== PAGAMENTOS =====
 
 app.post("/payments", autenticar, async (req, res) => {
@@ -780,7 +805,34 @@ app.get("/payments", autenticar, async (req, res) => {
     },
   });
 
-  res.json(payments);
+  const hoje = new Date();
+
+  const paymentsComAtraso = payments.map((payment) => {
+    if (payment.status !== "pendente" || payment.dueDate >= hoje) {
+      return {
+        ...payment,
+        diasAtraso: 0,
+        valorAtualizado: Number(payment.value),
+      };
+    }
+
+    const diasAtraso = Math.floor(
+      (hoje.getTime() - payment.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const valorOriginal = Number(payment.value);
+    const multa = valorOriginal * 0.02;
+    const juros = valorOriginal * 0.01 * (diasAtraso / 30);
+    const valorAtualizado = valorOriginal + multa + juros;
+
+    return {
+      ...payment,
+      diasAtraso,
+      valorAtualizado: Number(valorAtualizado.toFixed(2)),
+    };
+  });
+
+  res.json(paymentsComAtraso);
 });
 
 app.put("/payments/:id/pagar", autenticar, async (req, res) => {
