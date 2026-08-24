@@ -94,13 +94,14 @@ model Tenant {
 }
 
 model Contract {
-  id          Int      @id @default(autoincrement())
-  startDate   DateTime
-  endDate     DateTime
-  rentValue   Decimal
-  dueDay      Int
-  status      String   @default("ativo")
-  createdAt   DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  startDate           DateTime
+  endDate             DateTime
+  rentValue           Decimal
+  dueDay              Int
+  status              String    @default("ativo")
+  lastAdjustmentDate  DateTime?
+  createdAt           DateTime  @default(now())
 
   propertyId  Int
   property    Property @relation(fields: [propertyId], references: [id])

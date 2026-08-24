@@ -426,6 +426,59 @@ app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
   res.status(204).send();
 });
 
+// Lista contratos elegíveis para reajuste (aniversário de 12 meses desde o inicio ou ultimo reajuste)
+app.get("/contracts/adjustable", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const contratos = await prisma.contract.findMany({
+    where: { companyId: usuario.companyId, status: "ativo" },
+    include: { property: true, tenant: true },
+  });
+
+  const hoje = new Date();
+
+  const elegiveis = contratos.filter((contrato) => {
+    const dataBase = contrato.lastAdjustmentDate ?? contrato.startDate;
+    const proximoReajuste = new Date(dataBase);
+    proximoReajuste.setFullYear(proximoReajuste.getFullYear() + 1);
+    return proximoReajuste <= hoje;
+  });
+
+  res.json(elegiveis);
+});
+
+// Aplica o reajuste: recalcula o valor do aluguel com base em um percentual informado
+app.put("/contracts/:id/adjust", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+  const { percentage } = req.body;
+
+  if (percentage === undefined || isNaN(Number(percentage))) {
+    return res.status(400).json({ error: "Informe um percentual válido" });
+  }
+
+  const existente = await prisma.contract.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Contrato não encontrado" });
+  }
+
+  const novoValor =
+    Number(existente.rentValue) * (1 + Number(percentage) / 100);
+
+  const contract = await prisma.contract.update({
+    where: { id: Number(id) },
+    data: {
+      rentValue: novoValor,
+      lastAdjustmentDate: new Date(),
+    },
+  });
+
+  res.json(contract);
+});
+
 // ===== PROPRIETÁRIOS =====
 
 app.post("/owners", autenticar, async (req, res) => {
