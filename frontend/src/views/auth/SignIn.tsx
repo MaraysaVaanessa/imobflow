@@ -1,7 +1,7 @@
 import InputField from "components/fields/InputField";
 import Checkbox from "components/checkbox";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -84,12 +84,12 @@ export default function SignIn() {
           <span className=" text-sm font-medium text-navy-700 dark:text-gray-600">
             Not registered yet?
           </span>
-          <a
-            href=" "
+          <Link
+            to="/auth/sign-up"
             className="ml-1 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-white"
           >
             Create an account
-          </a>
+          </Link>
         </div>
       </div>
     </div>
