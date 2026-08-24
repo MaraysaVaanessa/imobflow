@@ -25,10 +25,8 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Serve os arquivos de upload publicamente (para exibir as fotos no frontend)
 app.use("/uploads", express.static(uploadsDir));
 
-// Configuração do multer: define onde e com que nome salvar o arquivo
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
@@ -45,17 +43,60 @@ app.get("/", (req, res) => {
   res.send("ImobFlow API está funcionando!");
 });
 
-// Rota de cadastro de usuário
-app.post("/users", async (req, res) => {
-  const { name, email, password } = req.body;
+// ===== CADASTRO E LOGIN =====
+
+// Cadastro de uma empresa nova (cria a empresa + primeiro usuário, que já nasce admin)
+app.post("/signup", async (req, res) => {
+  const { name, email, password, companyName } = req.body;
+
+  if (!name || !email || !password || !companyName) {
+    return res.status(400).json({ error: "Preencha todos os campos" });
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
+
+  const company = await prisma.company.create({
+    data: { name: companyName },
+  });
 
   const user = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash,
+      role: "admin",
+      companyId: company.id,
+    },
+  });
+
+  res.status(201).json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    companyId: company.id,
+  });
+});
+
+// Cadastro de rota antiga, mantida por compatibilidade com testes existentes
+app.post("/users", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  // Se não houver nenhuma empresa ainda, cria uma padrão
+  let company = await prisma.company.findFirst();
+  if (!company) {
+    company = await prisma.company.create({
+      data: { name: "Empresa Padrão" },
+    });
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      companyId: company.id,
     },
   });
 
@@ -85,7 +126,12 @@ app.post("/login", async (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+    },
     process.env.JWT_SECRET as string,
     { expiresIn: "7d" },
   );
@@ -97,6 +143,7 @@ app.post("/login", async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      companyId: user.companyId,
     },
   });
 });
@@ -139,7 +186,6 @@ function somenteAdmin(
   next();
 }
 
-// Rota de teste protegida
 // Rota de teste protegida
 app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
@@ -193,18 +239,20 @@ app.put("/me/profile", autenticar, async (req, res) => {
 
 // Rota de estatísticas do dashboard
 app.get("/stats", autenticar, async (req, res) => {
-  const totalUsuarios = await prisma.user.count();
-  const totalImoveis = await prisma.property.count();
-  const totalProprietarios = await prisma.owner.count();
-  const totalInquilinos = await prisma.tenant.count();
+  const usuario = (req as any).usuario;
+  const companyId = usuario.companyId;
+
+  const totalImoveis = await prisma.property.count({ where: { companyId } });
+  const totalProprietarios = await prisma.owner.count({ where: { companyId } });
+  const totalInquilinos = await prisma.tenant.count({ where: { companyId } });
   const contratosAtivos = await prisma.contract.count({
-    where: { status: "ativo" },
+    where: { companyId, status: "ativo" },
   });
   const contratosInativos = await prisma.contract.count({
-    where: { status: "encerrado" },
+    where: { companyId, status: "encerrado" },
   });
   const manutencoesPendentes = await prisma.maintenance.count({
-    where: { status: "pendente" },
+    where: { companyId, status: "pendente" },
   });
 
   res.json({
@@ -220,7 +268,10 @@ app.get("/stats", autenticar, async (req, res) => {
 // ===== USUÁRIOS (apenas admin) =====
 
 app.get("/users", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const users = await prisma.user.findMany({
+    where: { companyId: usuario.companyId },
     select: {
       id: true,
       name: true,
@@ -234,12 +285,49 @@ app.get("/users", autenticar, somenteAdmin, async (req, res) => {
   res.json(users);
 });
 
+// Admin adiciona um novo operador à própria empresa
+app.post("/users/team", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Preencha todos os campos" });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash,
+      companyId: usuario.companyId,
+    },
+  });
+
+  res.status(201).json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  });
+});
+
 app.put("/users/:id/role", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const { role } = req.body;
 
   if (role !== "admin" && role !== "operador") {
     return res.status(400).json({ error: "Role inválida" });
+  }
+
+  const existente = await prisma.user.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Usuário não encontrado" });
   }
 
   const user = await prisma.user.update({
@@ -255,11 +343,20 @@ app.put("/users/:id/role", autenticar, somenteAdmin, async (req, res) => {
 
 app.post("/properties", autenticar, async (req, res) => {
   try {
+    const usuario = (req as any).usuario;
     const { address, type, rentValue, bedrooms, bathrooms, photoUrl } =
       req.body;
 
     const property = await prisma.property.create({
-      data: { address, type, rentValue, bedrooms, bathrooms, photoUrl },
+      data: {
+        address,
+        type,
+        rentValue,
+        bedrooms,
+        bathrooms,
+        photoUrl,
+        companyId: usuario.companyId,
+      },
     });
 
     res.status(201).json(property);
@@ -271,7 +368,10 @@ app.post("/properties", autenticar, async (req, res) => {
 
 app.get("/properties", autenticar, async (req, res) => {
   try {
+    const usuario = (req as any).usuario;
+
     const properties = await prisma.property.findMany({
+      where: { companyId: usuario.companyId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -284,9 +384,18 @@ app.get("/properties", autenticar, async (req, res) => {
 
 app.put("/properties/:id", autenticar, async (req, res) => {
   try {
+    const usuario = (req as any).usuario;
     const { id } = req.params;
     const { address, type, rentValue, bedrooms, bathrooms, status, photoUrl } =
       req.body;
+
+    const existente = await prisma.property.findFirst({
+      where: { id: Number(id), companyId: usuario.companyId },
+    });
+
+    if (!existente) {
+      return res.status(404).json({ error: "Imóvel não encontrado" });
+    }
 
     const property = await prisma.property.update({
       where: { id: Number(id) },
@@ -301,7 +410,16 @@ app.put("/properties/:id", autenticar, async (req, res) => {
 });
 
 app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.property.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Imóvel não encontrado" });
+  }
 
   await prisma.property.delete({ where: { id: Number(id) } });
 
@@ -311,17 +429,29 @@ app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== PROPRIETÁRIOS =====
 
 app.post("/owners", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { name, phone, email, cpf, address, photoUrl } = req.body;
 
   const owner = await prisma.owner.create({
-    data: { name, phone, email, cpf, address, photoUrl },
+    data: {
+      name,
+      phone,
+      email,
+      cpf,
+      address,
+      photoUrl,
+      companyId: usuario.companyId,
+    },
   });
 
   res.status(201).json(owner);
 });
 
 app.get("/owners", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const owners = await prisma.owner.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -329,8 +459,17 @@ app.get("/owners", autenticar, async (req, res) => {
 });
 
 app.put("/owners/:id", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const { name, phone, email, cpf, address, photoUrl } = req.body;
+
+  const existente = await prisma.owner.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Proprietário não encontrado" });
+  }
 
   const owner = await prisma.owner.update({
     where: { id: Number(id) },
@@ -341,7 +480,16 @@ app.put("/owners/:id", autenticar, async (req, res) => {
 });
 
 app.delete("/owners/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.owner.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Proprietário não encontrado" });
+  }
 
   await prisma.owner.delete({ where: { id: Number(id) } });
 
@@ -351,6 +499,7 @@ app.delete("/owners/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== INQUILINOS =====
 
 app.post("/tenants", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const {
     name,
     phone,
@@ -370,6 +519,7 @@ app.post("/tenants", autenticar, async (req, res) => {
       guarantorName,
       guarantorPhone,
       guarantorAddress,
+      companyId: usuario.companyId,
     },
   });
 
@@ -377,7 +527,10 @@ app.post("/tenants", autenticar, async (req, res) => {
 });
 
 app.get("/tenants", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const tenants = await prisma.tenant.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -385,6 +538,7 @@ app.get("/tenants", autenticar, async (req, res) => {
 });
 
 app.put("/tenants/:id", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const {
     name,
@@ -395,6 +549,14 @@ app.put("/tenants/:id", autenticar, async (req, res) => {
     guarantorPhone,
     guarantorAddress,
   } = req.body;
+
+  const existente = await prisma.tenant.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Inquilino não encontrado" });
+  }
 
   const tenant = await prisma.tenant.update({
     where: { id: Number(id) },
@@ -413,7 +575,16 @@ app.put("/tenants/:id", autenticar, async (req, res) => {
 });
 
 app.delete("/tenants/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.tenant.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Inquilino não encontrado" });
+  }
 
   await prisma.tenant.delete({ where: { id: Number(id) } });
 
@@ -423,6 +594,7 @@ app.delete("/tenants/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== CONTRATOS =====
 
 app.post("/contracts", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const {
     startDate,
     endDate,
@@ -442,6 +614,7 @@ app.post("/contracts", autenticar, async (req, res) => {
       propertyId,
       ownerId,
       tenantId,
+      companyId: usuario.companyId,
     },
   });
 
@@ -449,7 +622,10 @@ app.post("/contracts", autenticar, async (req, res) => {
 });
 
 app.get("/contracts", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const contracts = await prisma.contract.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { createdAt: "desc" },
     include: {
       property: true,
@@ -462,6 +638,7 @@ app.get("/contracts", autenticar, async (req, res) => {
 });
 
 app.put("/contracts/:id", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const {
     startDate,
@@ -473,6 +650,14 @@ app.put("/contracts/:id", autenticar, async (req, res) => {
     ownerId,
     tenantId,
   } = req.body;
+
+  const existente = await prisma.contract.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Contrato não encontrado" });
+  }
 
   const contract = await prisma.contract.update({
     where: { id: Number(id) },
@@ -492,7 +677,16 @@ app.put("/contracts/:id", autenticar, async (req, res) => {
 });
 
 app.delete("/contracts/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.contract.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Contrato não encontrado" });
+  }
 
   await prisma.contract.delete({ where: { id: Number(id) } });
 
@@ -502,6 +696,7 @@ app.delete("/contracts/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== PAGAMENTOS =====
 
 app.post("/payments", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { dueDate, value, contractId } = req.body;
 
   const payment = await prisma.payment.create({
@@ -509,6 +704,7 @@ app.post("/payments", autenticar, async (req, res) => {
       dueDate: new Date(dueDate),
       value,
       contractId,
+      companyId: usuario.companyId,
     },
   });
 
@@ -516,7 +712,10 @@ app.post("/payments", autenticar, async (req, res) => {
 });
 
 app.get("/payments", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const payments = await prisma.payment.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { dueDate: "asc" },
     include: {
       contract: {
@@ -532,7 +731,16 @@ app.get("/payments", autenticar, async (req, res) => {
 });
 
 app.put("/payments/:id/pagar", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.payment.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Pagamento não encontrado" });
+  }
 
   const payment = await prisma.payment.update({
     where: { id: Number(id) },
@@ -546,7 +754,16 @@ app.put("/payments/:id/pagar", autenticar, async (req, res) => {
 });
 
 app.delete("/payments/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.payment.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Pagamento não encontrado" });
+  }
 
   await prisma.payment.delete({ where: { id: Number(id) } });
 
@@ -556,6 +773,7 @@ app.delete("/payments/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== MANUTENÇÕES =====
 
 app.post("/maintenances", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { description, estimatedCost, propertyId, photoUrl } = req.body;
 
   const maintenance = await prisma.maintenance.create({
@@ -564,6 +782,7 @@ app.post("/maintenances", autenticar, async (req, res) => {
       estimatedCost,
       propertyId,
       photoUrl,
+      companyId: usuario.companyId,
     },
   });
 
@@ -571,7 +790,10 @@ app.post("/maintenances", autenticar, async (req, res) => {
 });
 
 app.get("/maintenances", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const maintenances = await prisma.maintenance.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { openedAt: "desc" },
     include: {
       property: true,
@@ -582,8 +804,17 @@ app.get("/maintenances", autenticar, async (req, res) => {
 });
 
 app.put("/maintenances/:id", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const { description, estimatedCost, status, photoUrl } = req.body;
+
+  const existente = await prisma.maintenance.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Manutenção não encontrada" });
+  }
 
   const maintenance = await prisma.maintenance.update({
     where: { id: Number(id) },
@@ -594,7 +825,16 @@ app.put("/maintenances/:id", autenticar, async (req, res) => {
 });
 
 app.put("/maintenances/:id/concluir", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.maintenance.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Manutenção não encontrada" });
+  }
 
   const maintenance = await prisma.maintenance.update({
     where: { id: Number(id) },
@@ -608,7 +848,16 @@ app.put("/maintenances/:id/concluir", autenticar, async (req, res) => {
 });
 
 app.delete("/maintenances/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.maintenance.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Manutenção não encontrada" });
+  }
 
   await prisma.maintenance.delete({ where: { id: Number(id) } });
 
@@ -618,6 +867,7 @@ app.delete("/maintenances/:id", autenticar, somenteAdmin, async (req, res) => {
 // ===== AGENDA =====
 
 app.post("/appointments", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { title, description, date, propertyId } = req.body;
 
   const appointment = await prisma.appointment.create({
@@ -626,6 +876,7 @@ app.post("/appointments", autenticar, async (req, res) => {
       description,
       date: new Date(date),
       propertyId: propertyId ? Number(propertyId) : null,
+      companyId: usuario.companyId,
     },
   });
 
@@ -633,7 +884,10 @@ app.post("/appointments", autenticar, async (req, res) => {
 });
 
 app.get("/appointments", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const appointments = await prisma.appointment.findMany({
+    where: { companyId: usuario.companyId },
     orderBy: { date: "asc" },
     include: {
       property: true,
@@ -644,8 +898,17 @@ app.get("/appointments", autenticar, async (req, res) => {
 });
 
 app.put("/appointments/:id", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
   const { title, description, date, status, propertyId } = req.body;
+
+  const existente = await prisma.appointment.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Compromisso não encontrado" });
+  }
 
   const appointment = await prisma.appointment.update({
     where: { id: Number(id) },
@@ -662,7 +925,16 @@ app.put("/appointments/:id", autenticar, async (req, res) => {
 });
 
 app.delete("/appointments/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { id } = req.params;
+
+  const existente = await prisma.appointment.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Compromisso não encontrado" });
+  }
 
   await prisma.appointment.delete({ where: { id: Number(id) } });
 
@@ -671,15 +943,16 @@ app.delete("/appointments/:id", autenticar, somenteAdmin, async (req, res) => {
 
 // ===== RELATÓRIOS =====
 
-// Resumo financeiro: total pago vs total pendente
 app.get("/reports/financial", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const pagos = await prisma.payment.aggregate({
-    where: { status: "pago" },
+    where: { companyId: usuario.companyId, status: "pago" },
     _sum: { value: true },
   });
 
   const pendentes = await prisma.payment.aggregate({
-    where: { status: "pendente" },
+    where: { companyId: usuario.companyId, status: "pendente" },
     _sum: { value: true },
   });
 
@@ -689,27 +962,29 @@ app.get("/reports/financial", autenticar, async (req, res) => {
   });
 });
 
-// Imóveis por status
 app.get("/reports/properties-status", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const disponiveis = await prisma.property.count({
-    where: { status: "disponivel" },
+    where: { companyId: usuario.companyId, status: "disponivel" },
   });
 
   const alugados = await prisma.property.count({
-    where: { status: "alugado" },
+    where: { companyId: usuario.companyId, status: "alugado" },
   });
 
   res.json({ disponiveis, alugados });
 });
 
-// Contratos vencendo nos próximos 30 dias
 app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const hoje = new Date();
   const em30Dias = new Date();
   em30Dias.setDate(hoje.getDate() + 30);
 
   const contratos = await prisma.contract.findMany({
     where: {
+      companyId: usuario.companyId,
       status: "ativo",
       endDate: {
         gte: hoje,
@@ -726,10 +1001,11 @@ app.get("/reports/expiring-contracts", autenticar, async (req, res) => {
   res.json(contratos);
 });
 
-// Pagamentos pendentes, ordenados pelo vencimento mais próximo
 app.get("/reports/pending-payments", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
   const pagamentos = await prisma.payment.findMany({
-    where: { status: "pendente" },
+    where: { companyId: usuario.companyId, status: "pendente" },
     orderBy: { dueDate: "asc" },
     take: 5,
     include: {
@@ -745,8 +1021,8 @@ app.get("/reports/pending-payments", autenticar, async (req, res) => {
   res.json(pagamentos);
 });
 
-// Receita dos últimos 7 dias (pagamentos recebidos, agrupados por dia)
 app.get("/reports/weekly-revenue", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const hoje = new Date();
   const seteDiasAtras = new Date();
   seteDiasAtras.setDate(hoje.getDate() - 6);
@@ -754,6 +1030,7 @@ app.get("/reports/weekly-revenue", autenticar, async (req, res) => {
 
   const pagamentos = await prisma.payment.findMany({
     where: {
+      companyId: usuario.companyId,
       status: "pago",
       paidAt: { gte: seteDiasAtras },
     },
@@ -783,6 +1060,7 @@ app.get("/reports/weekly-revenue", autenticar, async (req, res) => {
 // ===== BUSCA =====
 
 app.get("/search", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const query = String(req.query.q || "");
 
   if (!query.trim()) {
@@ -790,17 +1068,26 @@ app.get("/search", autenticar, async (req, res) => {
   }
 
   const properties = await prisma.property.findMany({
-    where: { address: { contains: query, mode: "insensitive" } },
+    where: {
+      companyId: usuario.companyId,
+      address: { contains: query, mode: "insensitive" },
+    },
     take: 5,
   });
 
   const owners = await prisma.owner.findMany({
-    where: { name: { contains: query, mode: "insensitive" } },
+    where: {
+      companyId: usuario.companyId,
+      name: { contains: query, mode: "insensitive" },
+    },
     take: 5,
   });
 
   const tenants = await prisma.tenant.findMany({
-    where: { name: { contains: query, mode: "insensitive" } },
+    where: {
+      companyId: usuario.companyId,
+      name: { contains: query, mode: "insensitive" },
+    },
     take: 5,
   });
 
@@ -809,7 +1096,6 @@ app.get("/search", autenticar, async (req, res) => {
 
 // ===== UPLOAD =====
 
-// Rota de upload de imagem — devolve a URL do arquivo salvo
 app.post("/upload", autenticar, upload.single("photo"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Nenhum arquivo enviado" });
@@ -818,66 +1104,8 @@ app.post("/upload", autenticar, upload.single("photo"), (req, res) => {
   res.json({ url });
 });
 
-// ===== NOTIFICAÇÕES =====
-
-app.get("/notifications", autenticar, async (req, res) => {
-  const hoje = new Date();
-  const em7Dias = new Date();
-  em7Dias.setDate(hoje.getDate() + 7);
-
-  const notificacoes: any[] = [];
-
-  // Contratos vencendo em 7 dias
-  const contratosVencendo = await prisma.contract.findMany({
-    where: {
-      status: "ativo",
-      endDate: { gte: hoje, lte: em7Dias },
-    },
-    include: { property: true },
-  });
-
-  contratosVencendo.forEach((contrato) => {
-    notificacoes.push({
-      tipo: "contrato_vencendo",
-      mensagem: `Contrato do imóvel "${contrato.property.address}" vence em breve`,
-    });
-  });
-
-  // Pagamentos atrasados
-  const pagamentosAtrasados = await prisma.payment.findMany({
-    where: {
-      status: "pendente",
-      dueDate: { lt: hoje },
-    },
-    include: { contract: { include: { property: true } } },
-  });
-
-  pagamentosAtrasados.forEach((pagamento) => {
-    notificacoes.push({
-      tipo: "pagamento_atrasado",
-      mensagem: `Pagamento do imóvel "${pagamento.contract.property.address}" está atrasado`,
-    });
-  });
-
-  // Manutenções pendentes
-  const manutencoesPendentes = await prisma.maintenance.findMany({
-    where: { status: "pendente" },
-    include: { property: true },
-  });
-
-  manutencoesPendentes.forEach((manutencao) => {
-    notificacoes.push({
-      tipo: "manutencao_pendente",
-      mensagem: `Manutenção pendente no imóvel "${manutencao.property.address}": ${manutencao.description}`,
-    });
-  });
-
-  res.json(notificacoes);
-});
-
 // ===== SUPORTE =====
 
-// Rota pública: qualquer pessoa pode enviar uma mensagem de suporte
 app.post("/support", async (req, res) => {
   const { name, email, message } = req.body;
 
@@ -892,7 +1120,6 @@ app.post("/support", async (req, res) => {
   res.status(201).json(supportMessage);
 });
 
-// Rota protegida: só admins veem as mensagens recebidas
 app.get("/support", autenticar, somenteAdmin, async (req, res) => {
   const messages = await prisma.supportMessage.findMany({
     orderBy: { createdAt: "desc" },
@@ -901,22 +1128,84 @@ app.get("/support", autenticar, somenteAdmin, async (req, res) => {
   res.json(messages);
 });
 
+// ===== NOTIFICAÇÕES =====
+
+app.get("/notifications", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const hoje = new Date();
+  const em7Dias = new Date();
+  em7Dias.setDate(hoje.getDate() + 7);
+
+  const notificacoes: any[] = [];
+
+  const contratosVencendo = await prisma.contract.findMany({
+    where: {
+      companyId: usuario.companyId,
+      status: "ativo",
+      endDate: { gte: hoje, lte: em7Dias },
+    },
+    include: { property: true },
+  });
+
+  contratosVencendo.forEach((contrato) => {
+    notificacoes.push({
+      tipo: "contrato_vencendo",
+      mensagem: `Contrato do imóvel "${contrato.property.address}" vence em breve`,
+    });
+  });
+
+  const pagamentosAtrasados = await prisma.payment.findMany({
+    where: {
+      companyId: usuario.companyId,
+      status: "pendente",
+      dueDate: { lt: hoje },
+    },
+    include: { contract: { include: { property: true } } },
+  });
+
+  pagamentosAtrasados.forEach((pagamento) => {
+    notificacoes.push({
+      tipo: "pagamento_atrasado",
+      mensagem: `Pagamento do imóvel "${pagamento.contract.property.address}" está atrasado`,
+    });
+  });
+
+  const manutencoesPendentes = await prisma.maintenance.findMany({
+    where: { companyId: usuario.companyId, status: "pendente" },
+    include: { property: true },
+  });
+
+  manutencoesPendentes.forEach((manutencao) => {
+    notificacoes.push({
+      tipo: "manutencao_pendente",
+      mensagem: `Manutenção pendente no imóvel "${manutencao.property.address}": ${manutencao.description}`,
+    });
+  });
+
+  res.json(notificacoes);
+});
+
 // ===== ASSISTENTE IA =====
 
 app.post("/ai/ask", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
   const { question } = req.body;
 
   try {
-    // 1. RETRIEVAL: busca os dados reais do sistema
     const [imoveis, contratos, pagamentos, manutencoes] = await Promise.all([
-      prisma.property.findMany(),
+      prisma.property.findMany({ where: { companyId: usuario.companyId } }),
       prisma.contract.findMany({
+        where: { companyId: usuario.companyId },
         include: { property: true, tenant: true },
       }),
       prisma.payment.findMany({
+        where: { companyId: usuario.companyId },
         include: { contract: { include: { property: true } } },
       }),
-      prisma.maintenance.findMany({ include: { property: true } }),
+      prisma.maintenance.findMany({
+        where: { companyId: usuario.companyId },
+        include: { property: true },
+      }),
     ]);
 
     const contexto = {
@@ -926,7 +1215,6 @@ app.post("/ai/ask", autenticar, async (req, res) => {
       manutencoes,
     };
 
-    // 2. GENERATION: manda os dados reais + pergunta pro Gemini
     const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
 
     const prompt = `
