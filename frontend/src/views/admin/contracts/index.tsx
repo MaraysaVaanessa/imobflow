@@ -9,6 +9,8 @@ const Contracts = () => {
   const [properties, setProperties] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const [adjustable, setAdjustable] = useState<any[]>([]);
+  const [percentages, setPercentages] = useState<{ [key: number]: string }>({});
 
   const [propertyId, setPropertyId] = useState("");
   const [ownerId, setOwnerId] = useState("");
@@ -31,18 +33,25 @@ const Contracts = () => {
   const buscarTudo = async () => {
     setCarregando(true);
     try {
-      const [contractsRes, propertiesRes, ownersRes, tenantsRes] =
-        await Promise.all([
-          fetch(`${API_URL}/contracts`, { headers }),
-          fetch(`${API_URL}/properties`, { headers }),
-          fetch(`${API_URL}/owners`, { headers }),
-          fetch(`${API_URL}/tenants`, { headers }),
-        ]);
+      const [
+        contractsRes,
+        propertiesRes,
+        ownersRes,
+        tenantsRes,
+        adjustableRes,
+      ] = await Promise.all([
+        fetch(`${API_URL}/contracts`, { headers }),
+        fetch(`${API_URL}/properties`, { headers }),
+        fetch(`${API_URL}/owners`, { headers }),
+        fetch(`${API_URL}/tenants`, { headers }),
+        fetch(`${API_URL}/contracts/adjustable`, { headers }),
+      ]);
 
       setContracts(await contractsRes.json());
       setProperties(await propertiesRes.json());
       setOwners(await ownersRes.json());
       setTenants(await tenantsRes.json());
+      setAdjustable(await adjustableRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os dados");
     } finally {
@@ -161,11 +170,91 @@ const Contracts = () => {
     }
   };
 
+  const handleAplicarReajuste = async (id: number) => {
+    const percentage = percentages[id];
+
+    if (!percentage || isNaN(Number(percentage))) {
+      setErro("Informe um percentual válido para o reajuste");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/contracts/${id}/adjust`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...headers,
+        },
+        body: JSON.stringify({ percentage: Number(percentage) }),
+      });
+
+      if (!response.ok) {
+        setErro("Erro ao aplicar reajuste");
+        return;
+      }
+
+      setSucesso("Reajuste aplicado com sucesso!");
+      setPercentages({ ...percentages, [id]: "" });
+      buscarTudo();
+
+      setTimeout(() => setSucesso(""), 4000);
+    } catch (err) {
+      setErro("Não foi possível conectar ao servidor");
+    }
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-navy-700 dark:text-white">
         Contratos
       </h1>
+
+      {/* Contratos elegíveis para reajuste */}
+      {adjustable.length > 0 && (
+        <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-5 dark:border-orange-500/30 dark:bg-orange-900/10">
+          <h2 className="mb-3 text-lg font-bold text-orange-700 dark:text-orange-400">
+            Contratos com reajuste pendente
+          </h2>
+
+          <div className="flex flex-col gap-3">
+            {adjustable.map((contract) => (
+              <div
+                key={contract.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 dark:border-white/10 dark:bg-navy-800"
+              >
+                <div>
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {contract.property?.address} — {contract.tenant?.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Valor atual: R$ {Number(contract.rentValue).toFixed(2)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="% do índice"
+                    value={percentages[contract.id] || ""}
+                    onChange={(e) =>
+                      setPercentages({
+                        ...percentages,
+                        [contract.id]: e.target.value,
+                      })
+                    }
+                    className="w-28 rounded-lg border p-2 text-sm dark:bg-navy-900 dark:text-white"
+                  />
+                  <button
+                    onClick={() => handleAplicarReajuste(contract.id)}
+                    className="rounded-lg bg-orange-500 px-3 py-2 text-sm text-white hover:bg-orange-600"
+                  >
+                    Aplicar reajuste
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Formulário de cadastro/edição */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
