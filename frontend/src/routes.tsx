@@ -13,6 +13,7 @@ import Appointments from "views/admin/appointments";
 import Assistant from "views/admin/assistant";
 import Reports from "views/admin/reports";
 import UserManagement from "views/admin/users";
+import Inspections from "views/admin/inspections";
 // Auth Imports
 import SignIn from "views/auth/SignIn";
 import SignUp from "views/auth/SignUp";
@@ -31,6 +32,7 @@ import {
   MdAssessment,
   MdSmartToy,
   MdManageAccounts,
+  MdFactCheck,
 } from "react-icons/md";
 const routes = [
   {
@@ -85,6 +87,13 @@ const routes = [
     path: "maintenances",
     icon: <MdBuild className="h-6 w-6" />,
     component: <Maintenances />,
+  },
+  {
+    name: "Vistorias",
+    layout: "/admin",
+    path: "inspections",
+    icon: <MdFactCheck className="h-6 w-6" />,
+    component: <Inspections />,
   },
   {
     name: "Agenda",

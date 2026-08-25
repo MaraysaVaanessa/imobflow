@@ -25,6 +25,7 @@ model Company {
   payments      Payment[]
   maintenances  Maintenance[]
   appointments  Appointment[]
+  inspections   Inspection[]
 }
 
 model User {
@@ -53,6 +54,7 @@ model Property {
   contracts Contract[]
   maintenances Maintenance[]
   appointments Appointment[]
+  inspections Inspection[]
 
   companyId Int
   company   Company @relation(fields: [companyId], references: [id])
@@ -112,6 +114,7 @@ model Contract {
   tenantId    Int
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   payments Payment[]
+  inspections Inspection[]
 
   companyId Int
   company   Company @relation(fields: [companyId], references: [id])
@@ -170,4 +173,32 @@ model SupportMessage {
   message   String
   status    String   @default("aberto")
   createdAt DateTime @default(now())
+}
+
+model Inspection {
+  id          Int      @id @default(autoincrement())
+  type        String
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  propertyId  Int
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  contractId  Int?
+  contract    Contract? @relation(fields: [contractId], references: [id])
+
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  items       InspectionItem[]
+}
+
+model InspectionItem {
+  id            Int        @id @default(autoincrement())
+  roomName      String
+  observation   String?
+  photoUrl      String?
+
+  inspectionId  Int
+  inspection    Inspection @relation(fields: [inspectionId], references: [id])
 }

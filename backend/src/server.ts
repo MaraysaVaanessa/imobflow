@@ -606,7 +606,6 @@ app.post("/contracts", autenticar, async (req, res) => {
     },
   });
 
-  // Gera automaticamente um pagamento pendente para cada mês do contrato
   const inicio = new Date(startDate);
   const fim = new Date(endDate);
   const pagamentosParaCriar: {
@@ -718,7 +717,6 @@ app.delete("/contracts/:id", autenticar, somenteAdmin, async (req, res) => {
   res.status(204).send();
 });
 
-// Lista contratos elegíveis para reajuste (aniversário de 12 meses desde o inicio ou ultimo reajuste)
 app.get("/contracts/adjustable", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
 
@@ -739,7 +737,6 @@ app.get("/contracts/adjustable", autenticar, async (req, res) => {
   res.json(elegiveis);
 });
 
-// Aplica o reajuste: recalcula o valor do aluguel com base em um percentual informado
 app.put("/contracts/:id/adjust", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
   const { id } = req.params;
@@ -1231,6 +1228,78 @@ app.get("/support", autenticar, somenteAdmin, async (req, res) => {
   });
 
   res.json(messages);
+});
+
+// ===== VISTORIAS =====
+
+app.post("/inspections", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { type, propertyId, contractId, items } = req.body;
+
+  if (!type || !propertyId || !items || items.length === 0) {
+    return res.status(400).json({ error: "Preencha os dados da vistoria" });
+  }
+
+  const inspection = await prisma.inspection.create({
+    data: {
+      type,
+      propertyId: Number(propertyId),
+      contractId: contractId ? Number(contractId) : null,
+      companyId: usuario.companyId,
+      items: {
+        create: items.map((item: any) => ({
+          roomName: item.roomName,
+          observation: item.observation || null,
+          photoUrl: item.photoUrl || null,
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  res.status(201).json(inspection);
+});
+
+app.get("/inspections", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { propertyId } = req.query;
+
+  const inspections = await prisma.inspection.findMany({
+    where: {
+      companyId: usuario.companyId,
+      ...(propertyId ? { propertyId: Number(propertyId) } : {}),
+    },
+    orderBy: { date: "desc" },
+    include: {
+      property: true,
+      items: true,
+      contract: {
+        include: { owner: true, tenant: true },
+      },
+    },
+  });
+
+  res.json(inspections);
+});
+
+app.delete("/inspections/:id", autenticar, somenteAdmin, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+
+  const existente = await prisma.inspection.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!existente) {
+    return res.status(404).json({ error: "Vistoria não encontrada" });
+  }
+
+  await prisma.inspectionItem.deleteMany({
+    where: { inspectionId: Number(id) },
+  });
+  await prisma.inspection.delete({ where: { id: Number(id) } });
+
+  res.status(204).send();
 });
 
 // ===== NOTIFICAÇÕES =====
