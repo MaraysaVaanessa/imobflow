@@ -1,12 +1,24 @@
 import Card from "components/card";
 
+type StatusType = "success" | "warning" | "danger" | "default";
+
+const statusColors: Record<StatusType, string> = {
+  success:
+    "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+  warning:
+    "bg-orange-100 text-orange-500 dark:bg-orange-900/30 dark:text-orange-400",
+  danger: "bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400",
+  default: "bg-lightPrimary text-brand-500 dark:bg-navy-700 dark:text-white",
+};
+
 const Widget = (props: {
   icon: JSX.Element;
   title: string;
   subtitle: string;
   onClick?: () => void;
+  status?: StatusType;
 }) => {
-  const { icon, title, subtitle, onClick } = props;
+  const { icon, title, subtitle, onClick, status = "default" } = props;
   return (
     <Card
       extra={`!flex-row flex-grow items-center rounded-[20px] ${
@@ -15,10 +27,8 @@ const Widget = (props: {
       onClick={onClick}
     >
       <div className="ml-[18px] flex h-[90px] w-auto flex-row items-center">
-        <div className="rounded-full bg-lightPrimary p-3 dark:bg-navy-700">
-          <span className="flex items-center text-brand-500 dark:text-white">
-            {icon}
-          </span>
+        <div className={`rounded-full p-3 ${statusColors[status]}`}>
+          <span className="flex items-center">{icon}</span>
         </div>
       </div>
 

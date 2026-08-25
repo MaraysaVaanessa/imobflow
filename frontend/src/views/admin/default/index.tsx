@@ -57,36 +57,42 @@ const Dashboard = () => {
           title={"Imóveis Cadastrados"}
           subtitle={String(stats.imoveis)}
           onClick={() => navigate("/admin/properties")}
+          status="default"
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Contratos Ativos"}
           subtitle={String(stats.contratosAtivos)}
           onClick={() => navigate("/admin/contracts")}
+          status="success"
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Contratos Encerrados"}
           subtitle={String(stats.contratosInativos)}
           onClick={() => navigate("/admin/contracts")}
+          status="default"
         />
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}
           title={"Proprietários"}
           subtitle={String(stats.proprietarios)}
           onClick={() => navigate("/admin/owners")}
+          status="default"
         />
         <Widget
           icon={<MdDashboard className="h-6 w-6" />}
           title={"Inquilinos"}
           subtitle={String(stats.inquilinos)}
           onClick={() => navigate("/admin/tenants")}
+          status="default"
         />
         <Widget
           icon={<MdBarChart className="h-7 w-7" />}
           title={"Manutenções Pendentes"}
           subtitle={String(stats.manutencoesPendentes)}
           onClick={() => navigate("/admin/maintenances")}
+          status={stats.manutencoesPendentes > 0 ? "danger" : "success"}
         />
       </div>
 
