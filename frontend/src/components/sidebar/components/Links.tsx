@@ -22,16 +22,21 @@ export const SidebarLinks = (props: { routes: RoutesType[] }): JSX.Element => {
         route.layout === "/auth" ||
         route.layout === "/rtl"
       ) {
+        const ativo = activeRoute(route.path);
         return (
           <Link key={index} to={route.layout + "/" + route.path}>
-            <div className="relative mb-3 flex hover:cursor-pointer">
+            <div
+              className={`relative mb-3 flex hover:cursor-pointer ${
+                ativo ? "rounded-r-xl bg-brand-50 dark:bg-navy-700/50" : ""
+              }`}
+            >
               <li
                 className="my-[3px] flex cursor-pointer items-center px-8"
                 key={index}
               >
                 <span
                   className={`${
-                    activeRoute(route.path) === true
+                    ativo === true
                       ? "font-bold text-brand-500 dark:text-white"
                       : "font-medium text-gray-600"
                   }`}
@@ -40,7 +45,7 @@ export const SidebarLinks = (props: { routes: RoutesType[] }): JSX.Element => {
                 </span>
                 <p
                   className={`leading-1 ml-4 flex ${
-                    activeRoute(route.path) === true
+                    ativo === true
                       ? "font-bold text-navy-700 dark:text-white"
                       : "font-medium text-gray-600"
                   }`}
@@ -48,7 +53,7 @@ export const SidebarLinks = (props: { routes: RoutesType[] }): JSX.Element => {
                   {route.name}
                 </p>
               </li>
-              {activeRoute(route.path) ? (
+              {ativo ? (
                 <div className="absolute right-0 top-px h-9 w-1 rounded-lg bg-brand-500 dark:bg-brand-400" />
               ) : null}
             </div>
