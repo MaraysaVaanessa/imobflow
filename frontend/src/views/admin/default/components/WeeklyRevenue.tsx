@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import Card from "components/card";
 import BarChart from "components/charts/BarChart";
-import { MdBarChart } from "react-icons/md";
+import { MdBarChart, MdShowChart } from "react-icons/md";
 
 const WeeklyRevenue = () => {
   const [categorias, setCategorias] = useState<string[]>([]);
   const [valores, setValores] = useState<number[]>([]);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     const buscar = async () => {
@@ -20,16 +21,20 @@ const WeeklyRevenue = () => {
         setValores(data.valores);
       } catch (err) {
         console.error("Erro ao buscar receita semanal", err);
+      } finally {
+        setCarregando(false);
       }
     };
     buscar();
   }, []);
 
+  const semDados = !carregando && valores.every((v) => v === 0);
+
   const chartData = [
     {
       name: "Receita",
       data: valores,
-      color: "#5E37FF",
+      color: "#8B5E34",
     },
   ];
 
@@ -70,10 +75,10 @@ const WeeklyRevenue = () => {
     },
     fill: {
       type: "solid",
-      colors: ["#5E37FF"],
+      colors: ["#8B5E34"],
     },
     legend: { show: false },
-    colors: ["#5E37FF"],
+    colors: ["#8B5E34"],
     dataLabels: { enabled: false },
     plotOptions: {
       bar: {
@@ -94,11 +99,25 @@ const WeeklyRevenue = () => {
         </button>
       </div>
 
-      <div className="md:mt-16 lg:mt-0">
-        <div className="h-[250px] w-full xl:h-[350px]">
-          <BarChart chartData={chartData} chartOptions={chartOptions} />
+      {semDados ? (
+        <div className="flex h-[250px] w-full flex-col items-center justify-center gap-3 xl:h-[350px]">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-lightPrimary dark:bg-navy-700">
+            <MdShowChart className="h-8 w-8 text-brand-500" />
+          </div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-300">
+            Nenhuma receita registrada nos últimos 7 dias
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-400">
+            Marque pagamentos como pagos para ver o gráfico aqui
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="md:mt-16 lg:mt-0">
+          <div className="h-[250px] w-full xl:h-[350px]">
+            <BarChart chartData={chartData} chartOptions={chartOptions} />
+          </div>
+        </div>
+      )}
     </Card>
   );
 };
