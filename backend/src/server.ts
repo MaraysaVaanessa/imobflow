@@ -11,6 +11,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+import PDFDocument from "pdfkit";
+import ExcelJS from "exceljs";
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
 const app = express();
@@ -1062,6 +1065,101 @@ app.get("/reports/financial", autenticar, async (req, res) => {
     totalPago: pagos._sum.value ?? 0,
     totalPendente: pendentes._sum.value ?? 0,
   });
+});
+
+// Exporta o relatório financeiro em PDF
+app.get("/reports/financial/export/pdf", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const pagamentos = await prisma.payment.findMany({
+    where: { companyId: usuario.companyId },
+    orderBy: { dueDate: "desc" },
+    include: { contract: { include: { property: true, tenant: true } } },
+  });
+
+  const totalPago = pagamentos
+    .filter((p) => p.status === "pago")
+    .reduce((soma, p) => soma + Number(p.value), 0);
+  const totalPendente = pagamentos
+    .filter((p) => p.status === "pendente")
+    .reduce((soma, p) => soma + Number(p.value), 0);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=relatorio-financeiro.pdf",
+  );
+
+  const doc = new PDFDocument({ margin: 40 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text("Relatório Financeiro - ImobFlow", { align: "center" });
+  doc.moveDown();
+  doc.fontSize(10).text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`);
+  doc.moveDown();
+
+  doc.fontSize(12).text(`Total Recebido: R$ ${totalPago.toFixed(2)}`);
+  doc.text(`Total Pendente: R$ ${totalPendente.toFixed(2)}`);
+  doc.moveDown();
+
+  doc.fontSize(14).text("Pagamentos", { underline: true });
+  doc.moveDown(0.5);
+
+  pagamentos.forEach((p) => {
+    doc
+      .fontSize(9)
+      .text(
+        `${p.contract.property.address} - ${p.contract.tenant.name} | Venc: ${p.dueDate.toLocaleDateString("pt-BR")} | R$ ${Number(p.value).toFixed(2)} | ${p.status}`,
+      );
+  });
+
+  doc.end();
+});
+
+// Exporta o relatório financeiro em Excel
+app.get("/reports/financial/export/excel", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const pagamentos = await prisma.payment.findMany({
+    where: { companyId: usuario.companyId },
+    orderBy: { dueDate: "desc" },
+    include: { contract: { include: { property: true, tenant: true } } },
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Relatório Financeiro");
+
+  sheet.columns = [
+    { header: "Imóvel", key: "imovel", width: 30 },
+    { header: "Inquilino", key: "inquilino", width: 25 },
+    { header: "Vencimento", key: "vencimento", width: 15 },
+    { header: "Valor", key: "valor", width: 15 },
+    { header: "Status", key: "status", width: 15 },
+  ];
+
+  pagamentos.forEach((p) => {
+    sheet.addRow({
+      imovel: p.contract.property.address,
+      inquilino: p.contract.tenant.name,
+      vencimento: p.dueDate.toLocaleDateString("pt-BR"),
+      valor: Number(p.value),
+      status: p.status,
+    });
+  });
+
+  sheet.getRow(1).font = { bold: true };
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=relatorio-financeiro.xlsx",
+  );
+
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 app.get("/reports/properties-status", autenticar, async (req, res) => {

@@ -13,6 +13,7 @@ const Reports = () => {
   });
   const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
   const [erro, setErro] = useState("");
+  const [exportando, setExportando] = useState(false);
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -37,11 +38,61 @@ const Reports = () => {
     buscarRelatorios();
   }, []);
 
+  const handleExportar = async (formato: "pdf" | "excel") => {
+    setExportando(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/reports/financial/export/${formato}`,
+        { headers }
+      );
+
+      if (!response.ok) {
+        setErro("Não foi possível gerar o arquivo");
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        formato === "pdf"
+          ? "relatorio-financeiro.pdf"
+          : "relatorio-financeiro.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setErro("Não foi possível conectar ao servidor");
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-navy-700 dark:text-white">
-        Relatórios
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-navy-700 dark:text-white">
+          Relatórios
+        </h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleExportar("pdf")}
+            disabled={exportando}
+            className="rounded-lg bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+          >
+            {exportando ? "Gerando..." : "Exportar PDF"}
+          </button>
+          <button
+            onClick={() => handleExportar("excel")}
+            disabled={exportando}
+            className="rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            {exportando ? "Gerando..." : "Exportar Excel"}
+          </button>
+        </div>
+      </div>
 
       {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
 
