@@ -1407,6 +1407,8 @@ app.get("/notifications", autenticar, async (req, res) => {
   const hoje = new Date();
   const em7Dias = new Date();
   em7Dias.setDate(hoje.getDate() + 7);
+  const em5Dias = new Date();
+  em5Dias.setDate(hoje.getDate() + 5);
 
   const notificacoes: any[] = [];
 
@@ -1423,6 +1425,26 @@ app.get("/notifications", autenticar, async (req, res) => {
     notificacoes.push({
       tipo: "contrato_vencendo",
       mensagem: `Contrato do imóvel "${contrato.property.address}" vence em breve`,
+    });
+  });
+
+  // Pagamentos que vão vencer nos próximos 5 dias (lembrete antes do atraso)
+  const pagamentosProximosVencimento = await prisma.payment.findMany({
+    where: {
+      companyId: usuario.companyId,
+      status: "pendente",
+      dueDate: { gte: hoje, lte: em5Dias },
+    },
+    include: { contract: { include: { property: true, tenant: true } } },
+  });
+
+  pagamentosProximosVencimento.forEach((pagamento) => {
+    const dias = Math.ceil(
+      (pagamento.dueDate.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    notificacoes.push({
+      tipo: "pagamento_a_vencer",
+      mensagem: `Pagamento de ${pagamento.contract.tenant.name} (${pagamento.contract.property.address}) vence em ${dias} dia(s)`,
     });
   });
 
