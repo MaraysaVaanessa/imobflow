@@ -55,9 +55,19 @@ model Property {
   maintenances Maintenance[]
   appointments Appointment[]
   inspections Inspection[]
+  photos PropertyPhoto[]
 
   companyId Int
   company   Company @relation(fields: [companyId], references: [id])
+}
+
+model PropertyPhoto {
+  id          Int      @id @default(autoincrement())
+  url         String
+  createdAt   DateTime @default(now())
+
+  propertyId  Int
+  property    Property @relation(fields: [propertyId], references: [id])
 }
 
 model Owner {

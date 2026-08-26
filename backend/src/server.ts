@@ -417,6 +417,71 @@ app.delete("/properties/:id", autenticar, somenteAdmin, async (req, res) => {
   res.status(204).send();
 });
 
+// Adiciona uma foto à galeria do imóvel
+app.post("/properties/:id/photos", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: "URL da foto não informada" });
+  }
+
+  const property = await prisma.property.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!property) {
+    return res.status(404).json({ error: "Imóvel não encontrado" });
+  }
+
+  const photo = await prisma.propertyPhoto.create({
+    data: { url, propertyId: Number(id) },
+  });
+
+  res.status(201).json(photo);
+});
+
+// Lista as fotos da galeria de um imóvel
+app.get("/properties/:id/photos", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+
+  const property = await prisma.property.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+  });
+
+  if (!property) {
+    return res.status(404).json({ error: "Imóvel não encontrado" });
+  }
+
+  const photos = await prisma.propertyPhoto.findMany({
+    where: { propertyId: Number(id) },
+    orderBy: { createdAt: "asc" },
+  });
+
+  res.json(photos);
+});
+
+// Remove uma foto específica da galeria
+app.delete("/properties/photos/:photoId", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { photoId } = req.params;
+
+  const photo = await prisma.propertyPhoto.findUnique({
+    where: { id: Number(photoId) },
+    include: { property: true },
+  });
+
+  if (!photo || photo.property.companyId !== usuario.companyId) {
+    return res.status(404).json({ error: "Foto não encontrada" });
+  }
+
+  await prisma.propertyPhoto.delete({ where: { id: Number(photoId) } });
+
+  res.status(204).send();
+});
+
 // ===== PROPRIETÁRIOS =====
 
 app.post("/owners", autenticar, async (req, res) => {

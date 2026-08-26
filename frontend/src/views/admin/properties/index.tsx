@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PhotoUpload from "components/photoUpload/PhotoUpload";
+import PhotoGallery from "components/photoGallery/PhotoGallery";
 import { isAdmin } from "utils/auth";
 import { campoVazio } from "utils/validation";
 
@@ -156,6 +157,9 @@ const Properties = () => {
         </h2>
 
         <div className="mb-4">
+          <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">
+            Foto principal
+          </p>
           <PhotoUpload
             photoUrl={photoUrl}
             onUploaded={(url) => setPhotoUrl(url)}
@@ -209,6 +213,8 @@ const Properties = () => {
             </select>
           )}
         </div>
+
+        {editingId && <PhotoGallery propertyId={editingId} />}
 
         {erro && <p className="mt-3 text-sm text-red-500">{erro}</p>}
         {sucesso && <p className="mt-3 text-sm text-green-600">{sucesso}</p>}
