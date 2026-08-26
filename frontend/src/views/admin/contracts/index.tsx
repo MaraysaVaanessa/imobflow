@@ -4,6 +4,12 @@ import { campoVazio } from "utils/validation";
 
 const API_URL = "http://localhost:3333";
 
+const statusAssinaturaLabel: { [key: string]: string } = {
+  nao_enviado: "Não enviado",
+  aguardando_assinaturas: "Aguardando assinaturas",
+  assinado: "Assinado",
+};
+
 const Contracts = () => {
   const [contracts, setContracts] = useState<any[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
@@ -197,6 +203,30 @@ const Contracts = () => {
       setPercentages({ ...percentages, [id]: "" });
       buscarTudo();
 
+      setTimeout(() => setSucesso(""), 4000);
+    } catch (err) {
+      setErro("Não foi possível conectar ao servidor");
+    }
+  };
+
+  const handleEnviarParaAssinatura = async (id: number) => {
+    setErro("");
+    setSucesso("");
+    try {
+      const response = await fetch(
+        `${API_URL}/contracts/${id}/send-for-signature`,
+        { method: "POST", headers }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErro(data.error || "Erro ao enviar para assinatura");
+        return;
+      }
+
+      setSucesso("Contrato enviado para assinatura!");
+      buscarTudo();
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
@@ -398,35 +428,61 @@ const Contracts = () => {
             {contracts.map((contract) => (
               <div
                 key={contract.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
               >
-                <div>
-                  <p className="font-medium text-navy-700 dark:text-white">
-                    {contract.property?.address} — {contract.tenant?.name}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Proprietário: {contract.owner?.name} • R${" "}
-                    {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
-                    {contract.dueDay} • {contract.status}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {contract.startDate.slice(0, 10)} até{" "}
-                    {contract.endDate.slice(0, 10)}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditar(contract)}
-                    className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                  >
-                    Editar
-                  </button>
-                  {admin && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-navy-700 dark:text-white">
+                      {contract.property?.address} — {contract.tenant?.name}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Proprietário: {contract.owner?.name} • R${" "}
+                      {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
+                      {contract.dueDay} • {contract.status}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {contract.startDate.slice(0, 10)} até{" "}
+                      {contract.endDate.slice(0, 10)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => handleExcluir(contract.id)}
-                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      onClick={() => handleEditar(contract)}
+                      className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
                     >
-                      Excluir
+                      Editar
+                    </button>
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(contract.id)}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t pt-2 dark:border-white/10">
+                  <span
+                    className={`text-xs font-medium ${
+                      contract.signatureStatus === "assinado"
+                        ? "text-green-600"
+                        : contract.signatureStatus === "aguardando_assinaturas"
+                        ? "text-orange-500"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    Assinatura:{" "}
+                    {statusAssinaturaLabel[contract.signatureStatus] ||
+                      "Não enviado"}
+                  </span>
+                  {contract.signatureStatus === "nao_enviado" && admin && (
+                    <button
+                      onClick={() => handleEnviarParaAssinatura(contract.id)}
+                      className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
+                    >
+                      Enviar para assinatura digital
                     </button>
                   )}
                 </div>

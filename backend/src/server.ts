@@ -921,6 +921,71 @@ app.put("/contracts/:id/adjust", autenticar, async (req, res) => {
   res.json(contract);
 });
 
+// Envia o contrato para assinatura digital (estrutura preparada para integração futura com Clicksign)
+app.post(
+  "/contracts/:id/send-for-signature",
+  autenticar,
+  somenteAdmin,
+  async (req, res) => {
+    const usuario = (req as any).usuario;
+    const { id } = req.params;
+
+    const contract = await prisma.contract.findFirst({
+      where: { id: Number(id), companyId: usuario.companyId },
+      include: { owner: true, tenant: true, property: true },
+    });
+
+    if (!contract) {
+      return res.status(404).json({ error: "Contrato não encontrado" });
+    }
+
+    if (!process.env.CLICKSIGN_API_KEY) {
+      return res.status(503).json({
+        error:
+          "Assinatura digital ainda não configurada. Configure a chave de API da Clicksign para ativar esta funcionalidade.",
+      });
+    }
+
+    // TODO: quando a chave de API estiver configurada, implementar aqui:
+    // 1. Criar um "envelope" na Clicksign com o PDF do contrato
+    // 2. Adicionar os signatários (contract.owner.email, contract.tenant.email)
+    // 3. Enviar o envelope
+    // 4. Salvar o ID do envelope retornado
+
+    await prisma.contract.update({
+      where: { id: Number(id) },
+      data: { signatureStatus: "aguardando_assinaturas" },
+    });
+
+    res.json({ mensagem: "Contrato enviado para assinatura" });
+  },
+);
+
+// Consulta o status de assinatura de um contrato
+app.get("/contracts/:id/signature-status", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { id } = req.params;
+
+  const contract = await prisma.contract.findFirst({
+    where: { id: Number(id), companyId: usuario.companyId },
+    select: { signatureStatus: true, signedDocumentUrl: true },
+  });
+
+  if (!contract) {
+    return res.status(404).json({ error: "Contrato não encontrado" });
+  }
+
+  res.json(contract);
+});
+
+// Webhook: receberá notificações da Clicksign quando alguém assinar (estrutura preparada)
+app.post("/webhooks/clicksign", async (req, res) => {
+  // TODO: quando integrado de verdade, validar a assinatura do webhook
+  // e atualizar o contrato correspondente com o novo status/URL do documento assinado
+  console.log("Webhook da Clicksign recebido:", req.body);
+  res.status(200).send();
+});
+
 // ===== PAGAMENTOS =====
 
 app.post("/payments", autenticar, async (req, res) => {

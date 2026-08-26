@@ -118,6 +118,8 @@ model Contract {
   dueDay              Int
   status              String    @default("ativo")
   lastAdjustmentDate  DateTime?
+  signatureStatus     String    @default("nao_enviado")
+  signedDocumentUrl   String?
   createdAt           DateTime  @default(now())
 
   propertyId  Int
