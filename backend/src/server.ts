@@ -1322,6 +1322,77 @@ app.get("/reports/weekly-revenue", autenticar, async (req, res) => {
   res.json({ categorias, valores });
 });
 
+// Relatório de inadimplência agrupado por inquilino
+app.get("/reports/delinquency", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const hoje = new Date();
+
+  const pagamentosAtrasados = await prisma.payment.findMany({
+    where: {
+      companyId: usuario.companyId,
+      status: "pendente",
+      dueDate: { lt: hoje },
+    },
+    include: {
+      contract: {
+        include: { tenant: true, property: true },
+      },
+    },
+  });
+
+  const porInquilino: {
+    [tenantId: number]: {
+      tenantId: number;
+      tenantName: string;
+      totalAtrasado: number;
+      quantidadePagamentos: number;
+      pagamentos: any[];
+    };
+  } = {};
+
+  pagamentosAtrasados.forEach((pagamento) => {
+    const diasAtraso = Math.floor(
+      (hoje.getTime() - pagamento.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const valorOriginal = Number(pagamento.value);
+    const multa = valorOriginal * 0.02;
+    const juros = valorOriginal * 0.01 * (diasAtraso / 30);
+    const valorAtualizado = valorOriginal + multa + juros;
+
+    const tenantId = pagamento.contract.tenant.id;
+
+    if (!porInquilino[tenantId]) {
+      porInquilino[tenantId] = {
+        tenantId,
+        tenantName: pagamento.contract.tenant.name,
+        totalAtrasado: 0,
+        quantidadePagamentos: 0,
+        pagamentos: [],
+      };
+    }
+
+    porInquilino[tenantId].totalAtrasado += valorAtualizado;
+    porInquilino[tenantId].quantidadePagamentos += 1;
+    porInquilino[tenantId].pagamentos.push({
+      id: pagamento.id,
+      propertyAddress: pagamento.contract.property.address,
+      dueDate: pagamento.dueDate,
+      valorOriginal,
+      valorAtualizado: Number(valorAtualizado.toFixed(2)),
+      diasAtraso,
+    });
+  });
+
+  const resultado = Object.values(porInquilino)
+    .map((item) => ({
+      ...item,
+      totalAtrasado: Number(item.totalAtrasado.toFixed(2)),
+    }))
+    .sort((a, b) => b.totalAtrasado - a.totalAtrasado);
+
+  res.json(resultado);
+});
+
 // ===== BUSCA =====
 
 app.get("/search", autenticar, async (req, res) => {

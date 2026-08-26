@@ -12,6 +12,7 @@ const Reports = () => {
     alugados: 0,
   });
   const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
+  const [delinquency, setDelinquency] = useState<any[]>([]);
   const [erro, setErro] = useState("");
   const [exportando, setExportando] = useState(false);
 
@@ -20,15 +21,18 @@ const Reports = () => {
 
   const buscarRelatorios = async () => {
     try {
-      const [financialRes, statusRes, expiringRes] = await Promise.all([
-        fetch(`${API_URL}/reports/financial`, { headers }),
-        fetch(`${API_URL}/reports/properties-status`, { headers }),
-        fetch(`${API_URL}/reports/expiring-contracts`, { headers }),
-      ]);
+      const [financialRes, statusRes, expiringRes, delinquencyRes] =
+        await Promise.all([
+          fetch(`${API_URL}/reports/financial`, { headers }),
+          fetch(`${API_URL}/reports/properties-status`, { headers }),
+          fetch(`${API_URL}/reports/expiring-contracts`, { headers }),
+          fetch(`${API_URL}/reports/delinquency`, { headers }),
+        ]);
 
       setFinancial(await financialRes.json());
       setPropertiesStatus(await statusRes.json());
       setExpiringContracts(await expiringRes.json());
+      setDelinquency(await delinquencyRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os relatórios");
     }
@@ -119,6 +123,40 @@ const Reports = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Inadimplência por Inquilino */}
+      <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
+        <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
+          Inadimplência por Inquilino
+        </h2>
+
+        {delinquency.length === 0 ? (
+          <p className="text-gray-600 dark:text-gray-300">
+            Nenhum inquilino em atraso no momento.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {delinquency.map((item) => (
+              <div
+                key={item.tenantId}
+                className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-900/10"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {item.tenantName}
+                  </p>
+                  <p className="font-bold text-red-600">
+                    R$ {Number(item.totalAtrasado).toFixed(2)}
+                  </p>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {item.quantidadePagamentos} pagamento(s) em atraso
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Imóveis por Status */}
