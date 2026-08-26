@@ -1393,6 +1393,69 @@ app.get("/reports/delinquency", autenticar, async (req, res) => {
   res.json(resultado);
 });
 
+// Calcula o repasse devido a cada proprietário (aluguel recebido menos taxa de administração)
+app.get("/reports/owner-payouts", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+
+  const company = await prisma.company.findUnique({
+    where: { id: usuario.companyId },
+  });
+
+  const taxaPercentual = Number(company?.adminFeePercentage ?? 10);
+
+  const pagamentosPagos = await prisma.payment.findMany({
+    where: { companyId: usuario.companyId, status: "pago" },
+    include: {
+      contract: {
+        include: { owner: true, property: true },
+      },
+    },
+  });
+
+  const porProprietario: {
+    [ownerId: number]: {
+      ownerId: number;
+      ownerName: string;
+      totalRecebido: number;
+      taxaAdministracao: number;
+      valorRepasse: number;
+      quantidadePagamentos: number;
+    };
+  } = {};
+
+  pagamentosPagos.forEach((pagamento) => {
+    const ownerId = pagamento.contract.owner.id;
+    const valor = Number(pagamento.value);
+    const taxa = valor * (taxaPercentual / 100);
+    const repasse = valor - taxa;
+
+    if (!porProprietario[ownerId]) {
+      porProprietario[ownerId] = {
+        ownerId,
+        ownerName: pagamento.contract.owner.name,
+        totalRecebido: 0,
+        taxaAdministracao: 0,
+        valorRepasse: 0,
+        quantidadePagamentos: 0,
+      };
+    }
+
+    porProprietario[ownerId].totalRecebido += valor;
+    porProprietario[ownerId].taxaAdministracao += taxa;
+    porProprietario[ownerId].valorRepasse += repasse;
+    porProprietario[ownerId].quantidadePagamentos += 1;
+  });
+
+  const resultado = Object.values(porProprietario).map((item) => ({
+    ...item,
+    totalRecebido: Number(item.totalRecebido.toFixed(2)),
+    taxaAdministracao: Number(item.taxaAdministracao.toFixed(2)),
+    valorRepasse: Number(item.valorRepasse.toFixed(2)),
+  }));
+
+  res.json({ taxaPercentual, proprietarios: resultado });
+});
+
 // ===== BUSCA =====
 
 app.get("/search", autenticar, async (req, res) => {

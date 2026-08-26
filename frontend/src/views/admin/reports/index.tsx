@@ -13,6 +13,13 @@ const Reports = () => {
   });
   const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
   const [delinquency, setDelinquency] = useState<any[]>([]);
+  const [payouts, setPayouts] = useState<{
+    taxaPercentual: number;
+    proprietarios: any[];
+  }>({
+    taxaPercentual: 10,
+    proprietarios: [],
+  });
   const [erro, setErro] = useState("");
   const [exportando, setExportando] = useState(false);
 
@@ -21,18 +28,20 @@ const Reports = () => {
 
   const buscarRelatorios = async () => {
     try {
-      const [financialRes, statusRes, expiringRes, delinquencyRes] =
+      const [financialRes, statusRes, expiringRes, delinquencyRes, payoutsRes] =
         await Promise.all([
           fetch(`${API_URL}/reports/financial`, { headers }),
           fetch(`${API_URL}/reports/properties-status`, { headers }),
           fetch(`${API_URL}/reports/expiring-contracts`, { headers }),
           fetch(`${API_URL}/reports/delinquency`, { headers }),
+          fetch(`${API_URL}/reports/owner-payouts`, { headers }),
         ]);
 
       setFinancial(await financialRes.json());
       setPropertiesStatus(await statusRes.json());
       setExpiringContracts(await expiringRes.json());
       setDelinquency(await delinquencyRes.json());
+      setPayouts(await payoutsRes.json());
     } catch (err) {
       setErro("Não foi possível carregar os relatórios");
     }
@@ -123,6 +132,46 @@ const Reports = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Repasse aos Proprietários */}
+      <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
+        <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
+          Repasse aos Proprietários{" "}
+          <span className="text-sm font-normal text-gray-500">
+            (taxa de administração: {payouts.taxaPercentual}%)
+          </span>
+        </h2>
+
+        {payouts.proprietarios.length === 0 ? (
+          <p className="text-gray-600 dark:text-gray-300">
+            Nenhum repasse a calcular ainda (é necessário haver pagamentos
+            marcados como pagos).
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {payouts.proprietarios.map((item) => (
+              <div
+                key={item.ownerId}
+                className="rounded-lg border p-3 dark:border-white/10"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-navy-700 dark:text-white">
+                    {item.ownerName}
+                  </p>
+                  <p className="text-lg font-bold text-green-600">
+                    R$ {Number(item.valorRepasse).toFixed(2)}
+                  </p>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Recebido: R$ {Number(item.totalRecebido).toFixed(2)} • Taxa
+                  administrativa: R$ {Number(item.taxaAdministracao).toFixed(2)}{" "}
+                  • {item.quantidadePagamentos} pagamento(s)
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Inadimplência por Inquilino */}

@@ -13,9 +13,10 @@ datasource db {
 }
 
 model Company {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  name                String
+  adminFeePercentage  Decimal  @default(10)
+  createdAt           DateTime @default(now())
 
   users         User[]
   properties    Property[]
