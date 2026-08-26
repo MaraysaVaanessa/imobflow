@@ -638,6 +638,35 @@ app.post("/tenants", autenticar, async (req, res) => {
   res.status(201).json(tenant);
 });
 
+// Admin gera acesso ao portal para um inquilino (senha temporária)
+app.post(
+  "/tenants/:id/generate-access",
+  autenticar,
+  somenteAdmin,
+  async (req, res) => {
+    const usuario = (req as any).usuario;
+    const { id } = req.params;
+
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: Number(id), companyId: usuario.companyId },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Inquilino não encontrado" });
+    }
+
+    const senhaTemporaria = Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.hash(senhaTemporaria, 10);
+
+    await prisma.tenant.update({
+      where: { id: Number(id) },
+      data: { passwordHash, precisaTrocarSenha: true },
+    });
+
+    res.json({ senhaTemporaria, email: tenant.email });
+  },
+);
+
 app.get("/tenants", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
 
@@ -1729,6 +1758,32 @@ app.get("/owner-portal/me", autenticarProprietario, async (req, res) => {
   res.json(owner);
 });
 
+// Middleware: autentica o inquilino no portal próprio
+function autenticarInquilino(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token não fornecido" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+    if (payload.tipo !== "inquilino") {
+      return res.status(401).json({ error: "Token inválido para este acesso" });
+    }
+    (req as any).inquilino = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+}
+
 app.get("/owner-portal/contracts", autenticarProprietario, async (req, res) => {
   const proprietario = (req as any).proprietario;
 
@@ -1789,6 +1844,256 @@ app.get(
     });
 
     res.json(inspections);
+  },
+);
+
+// ===== PORTAL DO INQUILINO =====
+
+app.post("/tenant-portal/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const tenant = await prisma.tenant.findFirst({
+    where: { email },
+  });
+
+  if (!tenant || !tenant.passwordHash) {
+    return res
+      .status(401)
+      .json({ error: "Email ou senha inválidos, ou acesso não liberado" });
+  }
+
+  const senhaCorreta = await bcrypt.compare(password, tenant.passwordHash);
+
+  if (!senhaCorreta) {
+    return res.status(401).json({ error: "Email ou senha inválidos" });
+  }
+
+  const token = jwt.sign(
+    {
+      id: tenant.id,
+      email: tenant.email,
+      tipo: "inquilino",
+      companyId: tenant.companyId,
+    },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "7d" },
+  );
+
+  res.json({
+    token,
+    precisaTrocarSenha: tenant.precisaTrocarSenha,
+    tenant: { id: tenant.id, name: tenant.name, email: tenant.email },
+  });
+});
+
+app.put(
+  "/tenant-portal/change-password",
+  autenticarInquilino,
+  async (req, res) => {
+    const inquilino = (req as any).inquilino;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "A nova senha deve ter pelo menos 6 caracteres" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.tenant.update({
+      where: { id: inquilino.id },
+      data: { passwordHash, precisaTrocarSenha: false },
+    });
+
+    res.json({ sucesso: true });
+  },
+);
+
+app.get("/tenant-portal/me", autenticarInquilino, async (req, res) => {
+  const inquilino = (req as any).inquilino;
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: inquilino.id },
+    select: { id: true, name: true, email: true, phone: true },
+  });
+
+  res.json(tenant);
+});
+
+app.get("/tenant-portal/contracts", autenticarInquilino, async (req, res) => {
+  const inquilino = (req as any).inquilino;
+
+  const contracts = await prisma.contract.findMany({
+    where: { tenantId: inquilino.id },
+    include: { property: true, owner: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(contracts);
+});
+
+app.get("/tenant-portal/payments", autenticarInquilino, async (req, res) => {
+  const inquilino = (req as any).inquilino;
+
+  const payments = await prisma.payment.findMany({
+    where: { contract: { tenantId: inquilino.id } },
+    include: { contract: { include: { property: true } } },
+    orderBy: { dueDate: "desc" },
+  });
+
+  const hoje = new Date();
+
+  const paymentsComAtraso = payments.map((payment) => {
+    if (payment.status !== "pendente" || payment.dueDate >= hoje) {
+      return {
+        ...payment,
+        diasAtraso: 0,
+        valorAtualizado: Number(payment.value),
+      };
+    }
+
+    const diasAtraso = Math.floor(
+      (hoje.getTime() - payment.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const valorOriginal = Number(payment.value);
+    const multa = valorOriginal * 0.02;
+    const juros = valorOriginal * 0.01 * (diasAtraso / 30);
+    const valorAtualizado = valorOriginal + multa + juros;
+
+    return {
+      ...payment,
+      diasAtraso,
+      valorAtualizado: Number(valorAtualizado.toFixed(2)),
+    };
+  });
+
+  res.json(paymentsComAtraso);
+});
+
+app.post(
+  "/tenant-portal/maintenances",
+  autenticarInquilino,
+  async (req, res) => {
+    const inquilino = (req as any).inquilino;
+    const { description, propertyId } = req.body;
+
+    if (!description || !propertyId) {
+      return res
+        .status(400)
+        .json({ error: "Descreva o problema e informe o imóvel" });
+    }
+
+    // Confirma que o inquilino realmente tem um contrato ativo nesse imóvel
+    const contract = await prisma.contract.findFirst({
+      where: { tenantId: inquilino.id, propertyId: Number(propertyId) },
+    });
+
+    if (!contract) {
+      return res
+        .status(403)
+        .json({ error: "Você não tem um contrato vinculado a este imóvel" });
+    }
+
+    const maintenance = await prisma.maintenance.create({
+      data: {
+        description,
+        estimatedCost: 0,
+        propertyId: Number(propertyId),
+        companyId: inquilino.companyId,
+      },
+    });
+
+    res.status(201).json(maintenance);
+  },
+);
+
+// Gera um PDF (2ª via) de um pagamento específico do inquilino
+app.get(
+  "/tenant-portal/payments/:id/pdf",
+  autenticarInquilino,
+  async (req, res) => {
+    const inquilino = (req as any).inquilino;
+    const { id } = req.params;
+
+    const payment = await prisma.payment.findFirst({
+      where: {
+        id: Number(id),
+        contract: { tenantId: inquilino.id },
+      },
+      include: {
+        contract: { include: { property: true, owner: true, tenant: true } },
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: "Pagamento não encontrado" });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=2via-pagamento-${payment.id}.pdf`,
+    );
+
+    const doc = new PDFDocument({ margin: 50 });
+    doc.pipe(res);
+
+    doc
+      .fontSize(18)
+      .text("ImobFlow - Comprovante de Pagamento", { align: "center" });
+    doc.moveDown(2);
+
+    doc.fontSize(12).text(`Imóvel: ${payment.contract.property.address}`);
+    doc.text(`Inquilino: ${payment.contract.tenant.name}`);
+    doc.text(`Proprietário: ${payment.contract.owner.name}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text("Detalhes do pagamento", { underline: true });
+    doc.moveDown(0.5);
+    doc
+      .fontSize(12)
+      .text(`Vencimento: ${payment.dueDate.toLocaleDateString("pt-BR")}`);
+    doc.text(`Valor: R$ ${Number(payment.value).toFixed(2)}`);
+    doc.text(`Status: ${payment.status === "pago" ? "Pago" : "Pendente"}`);
+
+    if (payment.paidAt) {
+      doc.text(
+        `Data do pagamento: ${payment.paidAt.toLocaleDateString("pt-BR")}`,
+      );
+    }
+
+    doc.moveDown(2);
+    doc
+      .fontSize(9)
+      .fillColor("gray")
+      .text(`Documento gerado em ${new Date().toLocaleString("pt-BR")}`);
+
+    doc.end();
+  },
+);
+
+app.get(
+  "/tenant-portal/maintenances",
+  autenticarInquilino,
+  async (req, res) => {
+    const inquilino = (req as any).inquilino;
+
+    const contracts = await prisma.contract.findMany({
+      where: { tenantId: inquilino.id },
+      select: { propertyId: true },
+    });
+
+    const propertyIds = contracts.map((c) => c.propertyId);
+
+    const maintenances = await prisma.maintenance.findMany({
+      where: { propertyId: { in: propertyIds } },
+      include: { property: true },
+      orderBy: { openedAt: "desc" },
+    });
+
+    res.json(maintenances);
   },
 );
 

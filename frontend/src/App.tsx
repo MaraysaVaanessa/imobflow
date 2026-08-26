@@ -10,6 +10,9 @@ import Support from "views/legal/Support";
 import OwnerLogin from "views/ownerPortal/Login";
 import OwnerChangePassword from "views/ownerPortal/ChangePassword";
 import OwnerDashboard from "views/ownerPortal/Dashboard";
+import TenantLogin from "views/tenantPortal/Login";
+import TenantChangePassword from "views/tenantPortal/ChangePassword";
+import TenantDashboard from "views/tenantPortal/Dashboard";
 
 const App = () => {
   return (
@@ -36,6 +39,12 @@ const App = () => {
         path="/portal-proprietario/dashboard"
         element={<OwnerDashboard />}
       />
+      <Route path="/portal-inquilino/login" element={<TenantLogin />} />
+      <Route
+        path="/portal-inquilino/trocar-senha"
+        element={<TenantChangePassword />}
+      />
+      <Route path="/portal-inquilino/dashboard" element={<TenantDashboard />} />
       <Route path="/" element={<Navigate to="/admin" replace />} />
     </Routes>
   );

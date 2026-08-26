@@ -91,15 +91,17 @@ model Owner {
 }
 
 model Tenant {
-  id                Int      @id @default(autoincrement())
-  name              String
-  phone             String
-  email             String
-  cpf               String
-  guarantorName     String
-  guarantorPhone    String
-  guarantorAddress  String
-  createdAt         DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  name                String
+  phone               String
+  email               String
+  cpf                 String
+  guarantorName       String
+  guarantorPhone      String
+  guarantorAddress    String
+  createdAt           DateTime @default(now())
+  passwordHash        String?
+  precisaTrocarSenha  Boolean  @default(false)
   contracts Contract[]
 
   companyId Int
