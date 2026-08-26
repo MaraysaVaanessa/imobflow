@@ -103,12 +103,22 @@ const Properties = () => {
         return;
       }
 
+      const imovelSalvo = await response.json();
+
       setSucesso(
         editingId
           ? "Imóvel atualizado com sucesso!"
-          : "Imóvel cadastrado com sucesso!"
+          : "Imóvel cadastrado! Agora você pode adicionar fotos à galeria."
       );
-      limparFormulario();
+
+      if (!editingId) {
+        // Ao criar um imóvel novo, entra automaticamente em modo de edição
+        // para liberar a galeria de fotos
+        setEditingId(imovelSalvo.id);
+      } else {
+        limparFormulario();
+      }
+
       buscarImoveis();
 
       setTimeout(() => setSucesso(""), 4000);

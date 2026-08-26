@@ -182,6 +182,32 @@ function somenteAdmin(
   next();
 }
 
+// Middleware: autentica o proprietário no portal próprio
+function autenticarProprietario(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Token não fornecido" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+    if (payload.tipo !== "proprietario") {
+      return res.status(401).json({ error: "Token inválido para este acesso" });
+    }
+    (req as any).proprietario = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+}
+
 app.get("/me", autenticar, (req, res) => {
   res.json({ usuario: (req as any).usuario });
 });
@@ -534,6 +560,36 @@ app.put("/owners/:id", autenticar, async (req, res) => {
 
   res.json(owner);
 });
+
+// Admin gera acesso ao portal para um proprietário (senha temporária)
+app.post(
+  "/owners/:id/generate-access",
+  autenticar,
+  somenteAdmin,
+  async (req, res) => {
+    const usuario = (req as any).usuario;
+    const { id } = req.params;
+
+    const owner = await prisma.owner.findFirst({
+      where: { id: Number(id), companyId: usuario.companyId },
+    });
+
+    if (!owner) {
+      return res.status(404).json({ error: "Proprietário não encontrado" });
+    }
+
+    // Gera uma senha temporária aleatória de 8 caracteres
+    const senhaTemporaria = Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.hash(senhaTemporaria, 10);
+
+    await prisma.owner.update({
+      where: { id: Number(id) },
+      data: { passwordHash, precisaTrocarSenha: true },
+    });
+
+    res.json({ senhaTemporaria, email: owner.email });
+  },
+);
 
 app.delete("/owners/:id", autenticar, somenteAdmin, async (req, res) => {
   const usuario = (req as any).usuario;
@@ -1598,6 +1654,143 @@ app.delete("/inspections/:id", autenticar, somenteAdmin, async (req, res) => {
 
   res.status(204).send();
 });
+
+// ===== PORTAL DO PROPRIETÁRIO =====
+
+app.post("/owner-portal/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const owner = await prisma.owner.findFirst({
+    where: { email },
+  });
+
+  if (!owner || !owner.passwordHash) {
+    return res
+      .status(401)
+      .json({ error: "Email ou senha inválidos, ou acesso não liberado" });
+  }
+
+  const senhaCorreta = await bcrypt.compare(password, owner.passwordHash);
+
+  if (!senhaCorreta) {
+    return res.status(401).json({ error: "Email ou senha inválidos" });
+  }
+
+  const token = jwt.sign(
+    {
+      id: owner.id,
+      email: owner.email,
+      tipo: "proprietario",
+      companyId: owner.companyId,
+    },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "7d" },
+  );
+
+  res.json({
+    token,
+    precisaTrocarSenha: owner.precisaTrocarSenha,
+    owner: { id: owner.id, name: owner.name, email: owner.email },
+  });
+});
+
+app.put(
+  "/owner-portal/change-password",
+  autenticarProprietario,
+  async (req, res) => {
+    const proprietario = (req as any).proprietario;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "A nova senha deve ter pelo menos 6 caracteres" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.owner.update({
+      where: { id: proprietario.id },
+      data: { passwordHash, precisaTrocarSenha: false },
+    });
+
+    res.json({ sucesso: true });
+  },
+);
+
+app.get("/owner-portal/me", autenticarProprietario, async (req, res) => {
+  const proprietario = (req as any).proprietario;
+
+  const owner = await prisma.owner.findUnique({
+    where: { id: proprietario.id },
+    select: { id: true, name: true, email: true, phone: true, address: true },
+  });
+
+  res.json(owner);
+});
+
+app.get("/owner-portal/contracts", autenticarProprietario, async (req, res) => {
+  const proprietario = (req as any).proprietario;
+
+  const contracts = await prisma.contract.findMany({
+    where: { ownerId: proprietario.id },
+    include: { property: true, tenant: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(contracts);
+});
+
+app.get("/owner-portal/payouts", autenticarProprietario, async (req, res) => {
+  const proprietario = (req as any).proprietario;
+
+  const company = await prisma.company.findUnique({
+    where: { id: proprietario.companyId },
+  });
+  const taxaPercentual = Number(company?.adminFeePercentage ?? 10);
+
+  const pagamentosPagos = await prisma.payment.findMany({
+    where: {
+      contract: { ownerId: proprietario.id },
+      status: "pago",
+    },
+    include: { contract: { include: { property: true } } },
+    orderBy: { paidAt: "desc" },
+  });
+
+  const resultado = pagamentosPagos.map((p) => {
+    const valor = Number(p.value);
+    const taxa = valor * (taxaPercentual / 100);
+    return {
+      id: p.id,
+      propertyAddress: p.contract.property.address,
+      paidAt: p.paidAt,
+      valorRecebido: valor,
+      taxaAdministracao: Number(taxa.toFixed(2)),
+      valorRepasse: Number((valor - taxa).toFixed(2)),
+    };
+  });
+
+  res.json({ taxaPercentual, repasses: resultado });
+});
+
+app.get(
+  "/owner-portal/inspections",
+  autenticarProprietario,
+  async (req, res) => {
+    const proprietario = (req as any).proprietario;
+
+    const inspections = await prisma.inspection.findMany({
+      where: {
+        contract: { ownerId: proprietario.id },
+      },
+      include: { property: true, items: true },
+      orderBy: { date: "desc" },
+    });
+
+    res.json(inspections);
+  },
+);
 
 // ===== NOTIFICAÇÕES =====
 

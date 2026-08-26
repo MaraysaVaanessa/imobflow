@@ -72,14 +72,16 @@ model PropertyPhoto {
 }
 
 model Owner {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String
-  email     String
-  cpf       String
-  address   String
-  createdAt DateTime @default(now())
-  photoUrl  String?
+  id                  Int      @id @default(autoincrement())
+  name                String
+  phone               String
+  email               String
+  cpf                 String
+  address             String
+  createdAt           DateTime @default(now())
+  photoUrl            String?
+  passwordHash        String?
+  precisaTrocarSenha  Boolean  @default(false)
   contracts Contract[]
 
   companyId Int

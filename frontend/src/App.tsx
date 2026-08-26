@@ -7,6 +7,9 @@ import AuthLayout from "layouts/auth";
 import TermsOfUse from "views/legal/TermsOfUse";
 import PrivacyPolicy from "views/legal/PrivacyPolicy";
 import Support from "views/legal/Support";
+import OwnerLogin from "views/ownerPortal/Login";
+import OwnerChangePassword from "views/ownerPortal/ChangePassword";
+import OwnerDashboard from "views/ownerPortal/Dashboard";
 
 const App = () => {
   return (
@@ -24,6 +27,15 @@ const App = () => {
       <Route path="/terms-of-use" element={<TermsOfUse />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/support" element={<Support />} />
+      <Route path="/portal-proprietario/login" element={<OwnerLogin />} />
+      <Route
+        path="/portal-proprietario/trocar-senha"
+        element={<OwnerChangePassword />}
+      />
+      <Route
+        path="/portal-proprietario/dashboard"
+        element={<OwnerDashboard />}
+      />
       <Route path="/" element={<Navigate to="/admin" replace />} />
     </Routes>
   );
