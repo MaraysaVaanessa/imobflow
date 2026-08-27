@@ -12,6 +12,8 @@ const statusAssinaturaLabel: { [key: string]: string } = {
 
 const Contracts = () => {
   const [contracts, setContracts] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [properties, setProperties] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -36,37 +38,47 @@ const Contracts = () => {
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
-  const buscarTudo = async () => {
+  const buscarContratos = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const [
-        contractsRes,
-        propertiesRes,
-        ownersRes,
-        tenantsRes,
-        adjustableRes,
-      ] = await Promise.all([
-        fetch(`${API_URL}/contracts`, { headers }),
-        fetch(`${API_URL}/properties`, { headers }),
-        fetch(`${API_URL}/owners`, { headers }),
-        fetch(`${API_URL}/tenants`, { headers }),
-        fetch(`${API_URL}/contracts/adjustable`, { headers }),
-      ]);
-
-      setContracts(await contractsRes.json());
-      setProperties(await propertiesRes.json());
-      setOwners(await ownersRes.json());
-      setTenants(await tenantsRes.json());
-      setAdjustable(await adjustableRes.json());
+      const response = await fetch(
+        `${API_URL}/contracts/paginated?pagina=${pagina}`,
+        { headers }
+      );
+      const data = await response.json();
+      setContracts(data.contracts || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
-      setErro("Não foi possível carregar os dados");
+      setErro("Não foi possível carregar os contratos");
+      setContracts([]);
     } finally {
       setCarregando(false);
     }
   };
 
+  const buscarAuxiliares = async () => {
+    try {
+      const [propertiesRes, ownersRes, tenantsRes, adjustableRes] =
+        await Promise.all([
+          fetch(`${API_URL}/properties`, { headers }),
+          fetch(`${API_URL}/owners`, { headers }),
+          fetch(`${API_URL}/tenants`, { headers }),
+          fetch(`${API_URL}/contracts/adjustable`, { headers }),
+        ]);
+
+      setProperties(await propertiesRes.json());
+      setOwners(await ownersRes.json());
+      setTenants(await tenantsRes.json());
+      setAdjustable(await adjustableRes.json());
+    } catch (err) {
+      setErro("Não foi possível carregar os dados auxiliares");
+    }
+  };
+
   useEffect(() => {
-    buscarTudo();
+    buscarContratos(1);
+    buscarAuxiliares();
   }, []);
 
   const limparFormulario = () => {
@@ -140,7 +152,8 @@ const Contracts = () => {
           : "Contrato cadastrado com sucesso!"
       );
       limparFormulario();
-      buscarTudo();
+      buscarContratos(paginaAtual);
+      buscarAuxiliares();
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -170,7 +183,7 @@ const Contracts = () => {
         method: "DELETE",
         headers,
       });
-      buscarTudo();
+      buscarContratos(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir o contrato");
     }
@@ -201,7 +214,8 @@ const Contracts = () => {
 
       setSucesso("Reajuste aplicado com sucesso!");
       setPercentages({ ...percentages, [id]: "" });
-      buscarTudo();
+      buscarContratos(paginaAtual);
+      buscarAuxiliares();
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -226,7 +240,7 @@ const Contracts = () => {
       }
 
       setSucesso("Contrato enviado para assinatura!");
-      buscarTudo();
+      buscarContratos(paginaAtual);
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível conectar ao servidor");
@@ -239,7 +253,6 @@ const Contracts = () => {
         Contratos
       </h1>
 
-      {/* Contratos elegíveis para reajuste */}
       {adjustable.length > 0 && (
         <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-5 dark:border-orange-500/30 dark:bg-orange-900/10">
           <h2 className="mb-3 text-lg font-bold text-orange-700 dark:text-orange-400">
@@ -286,7 +299,6 @@ const Contracts = () => {
         </div>
       )}
 
-      {/* Formulário de cadastro/edição */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           {editingId ? "Editar contrato" : "Cadastrar novo contrato"}
@@ -411,7 +423,6 @@ const Contracts = () => {
         </div>
       </div>
 
-      {/* Lista de contratos */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Contratos cadastrados
@@ -424,71 +435,96 @@ const Contracts = () => {
             Nenhum contrato cadastrado ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {contracts.map((contract) => (
-              <div
-                key={contract.id}
-                className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-navy-700 dark:text-white">
-                      {contract.property?.address} — {contract.tenant?.name}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Proprietário: {contract.owner?.name} • R${" "}
-                      {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
-                      {contract.dueDay} • {contract.status}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {contract.startDate.slice(0, 10)} até{" "}
-                      {contract.endDate.slice(0, 10)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditar(contract)}
-                      className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                    >
-                      Editar
-                    </button>
-                    {admin && (
+          <>
+            <div className="flex flex-col gap-3">
+              {contracts.map((contract) => (
+                <div
+                  key={contract.id}
+                  className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-navy-700 dark:text-white">
+                        {contract.property?.address} — {contract.tenant?.name}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Proprietário: {contract.owner?.name} • R${" "}
+                        {Number(contract.rentValue).toFixed(2)} • Vencimento dia{" "}
+                        {contract.dueDay} • {contract.status}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {contract.startDate.slice(0, 10)} até{" "}
+                        {contract.endDate.slice(0, 10)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => handleExcluir(contract.id)}
-                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                        onClick={() => handleEditar(contract)}
+                        className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
                       >
-                        Excluir
+                        Editar
+                      </button>
+                      {admin && (
+                        <button
+                          onClick={() => handleExcluir(contract.id)}
+                          className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                        >
+                          Excluir
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t pt-2 dark:border-white/10">
+                    <span
+                      className={`text-xs font-medium ${
+                        contract.signatureStatus === "assinado"
+                          ? "text-green-600"
+                          : contract.signatureStatus ===
+                            "aguardando_assinaturas"
+                          ? "text-orange-500"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      Assinatura:{" "}
+                      {statusAssinaturaLabel[contract.signatureStatus] ||
+                        "Não enviado"}
+                    </span>
+                    {contract.signatureStatus === "nao_enviado" && admin && (
+                      <button
+                        onClick={() => handleEnviarParaAssinatura(contract.id)}
+                        className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
+                      >
+                        Enviar para assinatura digital
                       </button>
                     )}
                   </div>
                 </div>
+              ))}
+            </div>
 
-                <div className="flex items-center justify-between border-t pt-2 dark:border-white/10">
-                  <span
-                    className={`text-xs font-medium ${
-                      contract.signatureStatus === "assinado"
-                        ? "text-green-600"
-                        : contract.signatureStatus === "aguardando_assinaturas"
-                        ? "text-orange-500"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    Assinatura:{" "}
-                    {statusAssinaturaLabel[contract.signatureStatus] ||
-                      "Não enviado"}
-                  </span>
-                  {contract.signatureStatus === "nao_enviado" && admin && (
-                    <button
-                      onClick={() => handleEnviarParaAssinatura(contract.id)}
-                      className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
-                    >
-                      Enviar para assinatura digital
-                    </button>
-                  )}
-                </div>
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarContratos(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarContratos(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

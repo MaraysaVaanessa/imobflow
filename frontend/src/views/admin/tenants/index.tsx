@@ -6,6 +6,8 @@ const API_URL = "http://localhost:3333/tenants";
 
 const Tenants = () => {
   const [tenants, setTenants] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -25,23 +27,26 @@ const Tenants = () => {
   const token = localStorage.getItem("token");
   const admin = isAdmin();
 
-  const buscarInquilinos = async () => {
+  const buscarInquilinos = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${API_URL}/paginated?pagina=${pagina}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      setTenants(data);
+      setTenants(data.tenants || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os inquilinos");
+      setTenants([]);
     } finally {
       setCarregando(false);
     }
   };
 
   useEffect(() => {
-    buscarInquilinos();
+    buscarInquilinos(1);
   }, []);
 
   const limparFormulario = () => {
@@ -112,7 +117,7 @@ const Tenants = () => {
           : "Inquilino cadastrado com sucesso!"
       );
       limparFormulario();
-      buscarInquilinos();
+      buscarInquilinos(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -141,7 +146,7 @@ const Tenants = () => {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      buscarInquilinos();
+      buscarInquilinos(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir o inquilino");
     }
@@ -177,7 +182,6 @@ const Tenants = () => {
         Inquilinos
       </h1>
 
-      {/* Formulário de cadastro/edição */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           {editingId ? "Editar inquilino" : "Cadastrar novo inquilino"}
@@ -274,7 +278,6 @@ const Tenants = () => {
         </div>
       </div>
 
-      {/* Lista de inquilinos */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Inquilinos cadastrados
@@ -287,81 +290,105 @@ const Tenants = () => {
             Nenhum inquilino cadastrado ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {tenants.map((tenant) => (
-              <div
-                key={tenant.id}
-                className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-navy-700 dark:text-white">
-                      {tenant.name}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {tenant.phone} • {tenant.email} • CPF: {tenant.cpf}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Fiador: {tenant.guarantorName} • {tenant.guarantorPhone}
-                    </p>
+          <>
+            <div className="flex flex-col gap-3">
+              {tenants.map((tenant) => (
+                <div
+                  key={tenant.id}
+                  className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-navy-700 dark:text-white">
+                        {tenant.name}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {tenant.phone} • {tenant.email} • CPF: {tenant.cpf}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Fiador: {tenant.guarantorName} • {tenant.guarantorPhone}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditar(tenant)}
+                        className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                      >
+                        Editar
+                      </button>
+                      {admin && (
+                        <button
+                          onClick={() => handleExcluir(tenant.id)}
+                          className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                        >
+                          Excluir
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditar(tenant)}
-                      className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                    >
-                      Editar
-                    </button>
+
+                  <div className="border-t pt-2 dark:border-white/10">
                     {admin && (
                       <button
-                        onClick={() => handleExcluir(tenant.id)}
-                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                        onClick={() => handleGerarAcesso(tenant.id)}
+                        className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
                       >
-                        Excluir
+                        Gerar acesso ao Portal do Inquilino
                       </button>
+                    )}
+
+                    {acessoGerado[tenant.id] && (
+                      <div className="mt-2 rounded-lg bg-lightPrimary p-3 text-sm dark:bg-navy-900">
+                        <p className="font-medium text-navy-700 dark:text-white">
+                          Repasse estas credenciais ao inquilino:
+                        </p>
+                        <p className="mt-1 text-gray-700 dark:text-gray-300">
+                          Portal:{" "}
+                          <span className="font-mono">
+                            localhost:3000/portal-inquilino/login
+                          </span>
+                        </p>
+                        <p className="text-gray-700 dark:text-gray-300">
+                          Email:{" "}
+                          <span className="font-mono">
+                            {acessoGerado[tenant.id].email}
+                          </span>
+                        </p>
+                        <p className="text-gray-700 dark:text-gray-300">
+                          Senha temporária:{" "}
+                          <span className="font-mono font-bold">
+                            {acessoGerado[tenant.id].senha}
+                          </span>
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
+              ))}
+            </div>
 
-                <div className="border-t pt-2 dark:border-white/10">
-                  {admin && (
-                    <button
-                      onClick={() => handleGerarAcesso(tenant.id)}
-                      className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
-                    >
-                      Gerar acesso ao Portal do Inquilino
-                    </button>
-                  )}
-
-                  {acessoGerado[tenant.id] && (
-                    <div className="mt-2 rounded-lg bg-lightPrimary p-3 text-sm dark:bg-navy-900">
-                      <p className="font-medium text-navy-700 dark:text-white">
-                        Repasse estas credenciais ao inquilino:
-                      </p>
-                      <p className="mt-1 text-gray-700 dark:text-gray-300">
-                        Portal:{" "}
-                        <span className="font-mono">
-                          localhost:3000/portal-inquilino/login
-                        </span>
-                      </p>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        Email:{" "}
-                        <span className="font-mono">
-                          {acessoGerado[tenant.id].email}
-                        </span>
-                      </p>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        Senha temporária:{" "}
-                        <span className="font-mono font-bold">
-                          {acessoGerado[tenant.id].senha}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                </div>
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarInquilinos(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarInquilinos(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

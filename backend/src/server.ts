@@ -584,6 +584,28 @@ app.get("/owners", autenticar, async (req, res) => {
   res.json(owners);
 });
 
+app.get("/owners/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [owners, total] = await Promise.all([
+    prisma.owner.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { createdAt: "desc" },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.owner.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  res.json({
+    owners,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
+});
+
 app.put("/owners/:id", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
   const { id } = req.params;
@@ -680,6 +702,28 @@ app.post("/tenants", autenticar, async (req, res) => {
   });
 
   res.status(201).json(tenant);
+});
+
+app.get("/tenants/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [tenants, total] = await Promise.all([
+    prisma.tenant.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { createdAt: "desc" },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.tenant.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  res.json({
+    tenants,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
 });
 
 // Admin gera acesso ao portal para um inquilino (senha temporária)
@@ -856,6 +900,29 @@ app.get("/contracts", autenticar, async (req, res) => {
   });
 
   res.json(contracts);
+});
+
+app.get("/contracts/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [contracts, total] = await Promise.all([
+    prisma.contract.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { createdAt: "desc" },
+      include: { property: true, owner: true, tenant: true },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.contract.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  res.json({
+    contracts,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
 });
 
 app.put("/contracts/:id", autenticar, async (req, res) => {
