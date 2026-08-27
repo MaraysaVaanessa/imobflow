@@ -10,6 +10,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import rateLimit from "express-rate-limit";
 
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
@@ -38,7 +39,22 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "http://localhost:3001"],
+  }),
+);
+
+// Limita tentativas de login: no máximo 5 tentativas a cada 15 minutos por IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    error: "Muitas tentativas de login. Tente novamente em alguns minutos.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -106,7 +122,7 @@ app.post("/users", async (req, res) => {
   });
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   const user = await prisma.user.findUnique({
@@ -1751,7 +1767,7 @@ app.delete("/inspections/:id", autenticar, somenteAdmin, async (req, res) => {
 
 // ===== PORTAL DO PROPRIETÁRIO =====
 
-app.post("/owner-portal/login", async (req, res) => {
+app.post("/owner-portal/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   const owner = await prisma.owner.findFirst({
@@ -1914,7 +1930,7 @@ app.get(
 
 // ===== PORTAL DO INQUILINO =====
 
-app.post("/tenant-portal/login", async (req, res) => {
+app.post("/tenant-portal/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   const tenant = await prisma.tenant.findFirst({
