@@ -1161,6 +1161,56 @@ app.get("/payments", autenticar, async (req, res) => {
   res.json(paymentsComAtraso);
 });
 
+app.get("/payments/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [payments, total] = await Promise.all([
+    prisma.payment.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { dueDate: "asc" },
+      include: { contract: { include: { property: true, tenant: true } } },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.payment.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  const hoje = new Date();
+
+  const paymentsComAtraso = payments.map((payment) => {
+    if (payment.status !== "pendente" || payment.dueDate >= hoje) {
+      return {
+        ...payment,
+        diasAtraso: 0,
+        valorAtualizado: Number(payment.value),
+      };
+    }
+
+    const diasAtraso = Math.floor(
+      (hoje.getTime() - payment.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    const valorOriginal = Number(payment.value);
+    const multa = valorOriginal * 0.02;
+    const juros = valorOriginal * 0.01 * (diasAtraso / 30);
+    const valorAtualizado = valorOriginal + multa + juros;
+
+    return {
+      ...payment,
+      diasAtraso,
+      valorAtualizado: Number(valorAtualizado.toFixed(2)),
+    };
+  });
+
+  res.json({
+    payments: paymentsComAtraso,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
+});
+
 app.put("/payments/:id/pagar", autenticar, async (req, res) => {
   const usuario = (req as any).usuario;
   const { id } = req.params;
@@ -1232,6 +1282,29 @@ app.get("/maintenances", autenticar, async (req, res) => {
   });
 
   res.json(maintenances);
+});
+
+app.get("/maintenances/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [maintenances, total] = await Promise.all([
+    prisma.maintenance.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { openedAt: "desc" },
+      include: { property: true },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.maintenance.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  res.json({
+    maintenances,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
 });
 
 app.put("/maintenances/:id", autenticar, async (req, res) => {
@@ -1312,6 +1385,29 @@ app.post("/appointments", autenticar, async (req, res) => {
   });
 
   res.status(201).json(appointment);
+});
+
+app.get("/appointments/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const [appointments, total] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { companyId: usuario.companyId },
+      orderBy: { date: "asc" },
+      include: { property: true },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.appointment.count({ where: { companyId: usuario.companyId } }),
+  ]);
+
+  res.json({
+    appointments,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
 });
 
 app.get("/appointments", autenticar, async (req, res) => {
@@ -1838,6 +1934,39 @@ app.get("/inspections", autenticar, async (req, res) => {
   });
 
   res.json(inspections);
+});
+
+app.get("/inspections/paginated", autenticar, async (req, res) => {
+  const usuario = (req as any).usuario;
+  const { propertyId } = req.query;
+  const pagina = Number(req.query.pagina) || 1;
+  const porPagina = 10;
+
+  const where = {
+    companyId: usuario.companyId,
+    ...(propertyId ? { propertyId: Number(propertyId) } : {}),
+  };
+
+  const [inspections, total] = await Promise.all([
+    prisma.inspection.findMany({
+      where,
+      orderBy: { date: "desc" },
+      include: {
+        property: true,
+        items: true,
+        contract: { include: { owner: true, tenant: true } },
+      },
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+    prisma.inspection.count({ where }),
+  ]);
+
+  res.json({
+    inspections,
+    totalPaginas: Math.ceil(total / porPagina),
+    paginaAtual: pagina,
+  });
 });
 
 app.delete("/inspections/:id", autenticar, somenteAdmin, async (req, res) => {

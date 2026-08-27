@@ -12,6 +12,8 @@ type RoomItem = {
 
 const Inspections = () => {
   const [inspections, setInspections] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [properties, setProperties] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
 
@@ -31,30 +33,43 @@ const Inspections = () => {
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
-  const buscarTudo = async () => {
+  const buscarVistorias = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const [inspectionsRes, propertiesRes, contractsRes] = await Promise.all([
-        fetch(`${API_URL}/inspections`, { headers }),
-        fetch(`${API_URL}/properties`, { headers }),
-        fetch(`${API_URL}/contracts`, { headers }),
-      ]);
-
-      setInspections(await inspectionsRes.json());
-      setProperties(await propertiesRes.json());
-      setContracts(await contractsRes.json());
+      const response = await fetch(
+        `${API_URL}/inspections/paginated?pagina=${pagina}`,
+        { headers }
+      );
+      const data = await response.json();
+      setInspections(data.inspections || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+      setInspections([]);
     } finally {
       setCarregando(false);
     }
   };
 
+  const buscarAuxiliares = async () => {
+    try {
+      const [propertiesRes, contractsRes] = await Promise.all([
+        fetch(`${API_URL}/properties`, { headers }),
+        fetch(`${API_URL}/contracts`, { headers }),
+      ]);
+      setProperties(await propertiesRes.json());
+      setContracts(await contractsRes.json());
+    } catch (err) {
+      setErro("Não foi possível carregar os dados auxiliares");
+    }
+  };
+
   useEffect(() => {
-    buscarTudo();
+    buscarVistorias(1);
+    buscarAuxiliares();
   }, []);
 
-  // Filtra os contratos para mostrar só os do imóvel selecionado
   const contratosDoImovel = contracts.filter(
     (c) => String(c.propertyId) === propertyId
   );
@@ -124,7 +139,7 @@ const Inspections = () => {
 
       setSucesso("Vistoria registrada com sucesso!");
       limparFormulario();
-      buscarTudo();
+      buscarVistorias(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -140,7 +155,7 @@ const Inspections = () => {
         method: "DELETE",
         headers,
       });
-      buscarTudo();
+      buscarVistorias(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir a vistoria");
     }
@@ -152,7 +167,6 @@ const Inspections = () => {
         Vistorias
       </h1>
 
-      {/* Formulário de cadastro */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Nova vistoria
@@ -269,7 +283,6 @@ const Inspections = () => {
         </button>
       </div>
 
-      {/* Lista de vistorias */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Vistorias registradas
@@ -282,59 +295,83 @@ const Inspections = () => {
             Nenhuma vistoria registrada ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {inspections.map((inspection) => (
-              <div
-                key={inspection.id}
-                className="rounded-lg border p-3 dark:border-white/10"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-navy-700 dark:text-white">
-                    Vistoria #{inspection.id} — {inspection.property?.address} —{" "}
-                    {inspection.type === "entrada" ? "Entrada" : "Saída"}
-                  </p>
-                  {admin && (
-                    <button
-                      onClick={() => handleExcluir(inspection.id)}
-                      className="text-sm text-red-500 hover:text-red-600"
-                    >
-                      Excluir
-                    </button>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {new Date(inspection.date).toLocaleDateString("pt-BR")} •{" "}
-                  {inspection.items.length} cômodo(s) registrado(s)
-                </p>
-                {inspection.contract && (
+          <>
+            <div className="flex flex-col gap-3">
+              {inspections.map((inspection) => (
+                <div
+                  key={inspection.id}
+                  className="rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-navy-700 dark:text-white">
+                      Vistoria #{inspection.id} — {inspection.property?.address}{" "}
+                      — {inspection.type === "entrada" ? "Entrada" : "Saída"}
+                    </p>
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(inspection.id)}
+                        className="text-sm text-red-500 hover:text-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Contrato #{inspection.contract.id} • Proprietário:{" "}
-                    {inspection.contract.owner?.name} • Inquilino:{" "}
-                    {inspection.contract.tenant?.name}
+                    {new Date(inspection.date).toLocaleDateString("pt-BR")} •{" "}
+                    {inspection.items.length} cômodo(s) registrado(s)
                   </p>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {inspection.items.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-2 rounded-lg bg-lightPrimary px-2 py-1 text-xs dark:bg-navy-900"
-                    >
-                      {item.photoUrl && (
-                        <img
-                          src={item.photoUrl}
-                          alt={item.roomName}
-                          className="h-6 w-6 rounded object-cover"
-                        />
-                      )}
-                      <span className="text-navy-700 dark:text-white">
-                        {item.roomName}
-                      </span>
-                    </div>
-                  ))}
+                  {inspection.contract && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Contrato #{inspection.contract.id} • Proprietário:{" "}
+                      {inspection.contract.owner?.name} • Inquilino:{" "}
+                      {inspection.contract.tenant?.name}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {inspection.items.map((item: any) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 rounded-lg bg-lightPrimary px-2 py-1 text-xs dark:bg-navy-900"
+                      >
+                        {item.photoUrl && (
+                          <img
+                            src={item.photoUrl}
+                            alt={item.roomName}
+                            className="h-6 w-6 rounded object-cover"
+                          />
+                        )}
+                        <span className="text-navy-700 dark:text-white">
+                          {item.roomName}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarVistorias(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarVistorias(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

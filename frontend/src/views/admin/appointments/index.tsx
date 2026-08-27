@@ -6,6 +6,8 @@ const API_URL = "http://localhost:3333";
 
 const Appointments = () => {
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [properties, setProperties] = useState<any[]>([]);
 
   const [title, setTitle] = useState("");
@@ -21,25 +23,37 @@ const Appointments = () => {
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
-  const buscarTudo = async () => {
+  const buscarCompromissos = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const [appointmentsRes, propertiesRes] = await Promise.all([
-        fetch(`${API_URL}/appointments`, { headers }),
-        fetch(`${API_URL}/properties`, { headers }),
-      ]);
-
-      setAppointments(await appointmentsRes.json());
-      setProperties(await propertiesRes.json());
+      const response = await fetch(
+        `${API_URL}/appointments/paginated?pagina=${pagina}`,
+        { headers }
+      );
+      const data = await response.json();
+      setAppointments(data.appointments || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+      setAppointments([]);
     } finally {
       setCarregando(false);
     }
   };
 
+  const buscarImoveis = async () => {
+    try {
+      const response = await fetch(`${API_URL}/properties`, { headers });
+      setProperties(await response.json());
+    } catch (err) {
+      setErro("Não foi possível carregar os imóveis");
+    }
+  };
+
   useEffect(() => {
-    buscarTudo();
+    buscarCompromissos(1);
+    buscarImoveis();
   }, []);
 
   const validarFormulario = () => {
@@ -84,7 +98,7 @@ const Appointments = () => {
       setDescription("");
       setDate("");
       setPropertyId("");
-      buscarTudo();
+      buscarCompromissos(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -100,7 +114,7 @@ const Appointments = () => {
         method: "DELETE",
         headers,
       });
-      buscarTudo();
+      buscarCompromissos(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir o compromisso");
     }
@@ -112,7 +126,6 @@ const Appointments = () => {
         Agenda
       </h1>
 
-      {/* Formulário de cadastro */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Novo compromisso
@@ -168,7 +181,6 @@ const Appointments = () => {
         </button>
       </div>
 
-      {/* Lista de compromissos */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Compromissos
@@ -181,38 +193,62 @@ const Appointments = () => {
             Nenhum compromisso registrado ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {appointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-              >
-                <div>
-                  <p className="font-medium text-navy-700 dark:text-white">
-                    {appointment.title}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {new Date(appointment.date).toLocaleString("pt-BR")}
-                    {appointment.property &&
-                      ` • ${appointment.property.address}`}
-                  </p>
-                  {appointment.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {appointment.description}
+          <>
+            <div className="flex flex-col gap-3">
+              {appointments.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div>
+                    <p className="font-medium text-navy-700 dark:text-white">
+                      {appointment.title}
                     </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {new Date(appointment.date).toLocaleString("pt-BR")}
+                      {appointment.property &&
+                        ` • ${appointment.property.address}`}
+                    </p>
+                    {appointment.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {appointment.description}
+                      </p>
+                    )}
+                  </div>
+                  {admin && (
+                    <button
+                      onClick={() => handleExcluir(appointment.id)}
+                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                    >
+                      Excluir
+                    </button>
                   )}
                 </div>
-                {admin && (
-                  <button
-                    onClick={() => handleExcluir(appointment.id)}
-                    className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                  >
-                    Excluir
-                  </button>
-                )}
+              ))}
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarCompromissos(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarCompromissos(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

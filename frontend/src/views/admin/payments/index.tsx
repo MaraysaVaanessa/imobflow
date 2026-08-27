@@ -6,6 +6,8 @@ const API_URL = "http://localhost:3333";
 
 const Payments = () => {
   const [payments, setPayments] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [contracts, setContracts] = useState<any[]>([]);
 
   const [contractId, setContractId] = useState("");
@@ -20,25 +22,37 @@ const Payments = () => {
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
-  const buscarTudo = async () => {
+  const buscarPagamentos = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const [paymentsRes, contractsRes] = await Promise.all([
-        fetch(`${API_URL}/payments`, { headers }),
-        fetch(`${API_URL}/contracts`, { headers }),
-      ]);
-
-      setPayments(await paymentsRes.json());
-      setContracts(await contractsRes.json());
+      const response = await fetch(
+        `${API_URL}/payments/paginated?pagina=${pagina}`,
+        { headers }
+      );
+      const data = await response.json();
+      setPayments(data.payments || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+      setPayments([]);
     } finally {
       setCarregando(false);
     }
   };
 
+  const buscarContratos = async () => {
+    try {
+      const response = await fetch(`${API_URL}/contracts`, { headers });
+      setContracts(await response.json());
+    } catch (err) {
+      setErro("Não foi possível carregar os contratos");
+    }
+  };
+
   useEffect(() => {
-    buscarTudo();
+    buscarPagamentos(1);
+    buscarContratos();
   }, []);
 
   const validarFormulario = () => {
@@ -83,7 +97,7 @@ const Payments = () => {
       setContractId("");
       setDueDate("");
       setValue("");
-      buscarTudo();
+      buscarPagamentos(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -100,7 +114,7 @@ const Payments = () => {
         headers,
       });
       setSucesso("Pagamento marcado como pago!");
-      buscarTudo();
+      buscarPagamentos(paginaAtual);
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível marcar como pago");
@@ -113,7 +127,7 @@ const Payments = () => {
         method: "DELETE",
         headers,
       });
-      buscarTudo();
+      buscarPagamentos(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir o pagamento");
     }
@@ -125,7 +139,6 @@ const Payments = () => {
         Financeiro
       </h1>
 
-      {/* Formulário de cadastro */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Registrar novo pagamento
@@ -173,7 +186,6 @@ const Payments = () => {
         </button>
       </div>
 
-      {/* Lista de pagamentos */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Pagamentos
@@ -186,59 +198,83 @@ const Payments = () => {
             Nenhum pagamento registrado ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {payments.map((payment) => (
-              <div
-                key={payment.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-              >
-                <div>
-                  <p className="font-medium text-navy-700 dark:text-white">
-                    {payment.contract?.property?.address} —{" "}
-                    {payment.contract?.tenant?.name}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Vencimento: {payment.dueDate.slice(0, 10)} • R${" "}
-                    {Number(payment.value).toFixed(2)} •{" "}
-                    <span
-                      className={
-                        payment.status === "pago"
-                          ? "font-medium text-green-600"
-                          : "font-medium text-orange-500"
-                      }
-                    >
-                      {payment.status}
-                    </span>
-                  </p>
-                  {payment.diasAtraso > 0 && (
-                    <p className="text-sm font-medium text-red-500">
-                      Atrasado há {payment.diasAtraso} dia(s) • Valor atualizado
-                      (com multa e juros): R${" "}
-                      {Number(payment.valorAtualizado).toFixed(2)}
+          <>
+            <div className="flex flex-col gap-3">
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div>
+                    <p className="font-medium text-navy-700 dark:text-white">
+                      {payment.contract?.property?.address} —{" "}
+                      {payment.contract?.tenant?.name}
                     </p>
-                  )}
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Vencimento: {payment.dueDate.slice(0, 10)} • R${" "}
+                      {Number(payment.value).toFixed(2)} •{" "}
+                      <span
+                        className={
+                          payment.status === "pago"
+                            ? "font-medium text-green-600"
+                            : "font-medium text-orange-500"
+                        }
+                      >
+                        {payment.status}
+                      </span>
+                    </p>
+                    {payment.diasAtraso > 0 && (
+                      <p className="text-sm font-medium text-red-500">
+                        Atrasado há {payment.diasAtraso} dia(s) • Valor
+                        atualizado: R${" "}
+                        {Number(payment.valorAtualizado).toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {payment.status === "pendente" && (
+                      <button
+                        onClick={() => handleMarcarPago(payment.id)}
+                        className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                      >
+                        Marcar como pago
+                      </button>
+                    )}
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(payment.id)}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {payment.status === "pendente" && (
-                    <button
-                      onClick={() => handleMarcarPago(payment.id)}
-                      className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                    >
-                      Marcar como pago
-                    </button>
-                  )}
-                  {admin && (
-                    <button
-                      onClick={() => handleExcluir(payment.id)}
-                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                    >
-                      Excluir
-                    </button>
-                  )}
-                </div>
+              ))}
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarPagamentos(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarPagamentos(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

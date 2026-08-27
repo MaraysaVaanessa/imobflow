@@ -6,6 +6,8 @@ const API_URL = "http://localhost:3333";
 
 const Maintenances = () => {
   const [maintenances, setMaintenances] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [properties, setProperties] = useState<any[]>([]);
 
   const [propertyId, setPropertyId] = useState("");
@@ -20,25 +22,37 @@ const Maintenances = () => {
   const headers = { Authorization: `Bearer ${token}` };
   const admin = isAdmin();
 
-  const buscarTudo = async () => {
+  const buscarManutencoes = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const [maintenancesRes, propertiesRes] = await Promise.all([
-        fetch(`${API_URL}/maintenances`, { headers }),
-        fetch(`${API_URL}/properties`, { headers }),
-      ]);
-
-      setMaintenances(await maintenancesRes.json());
-      setProperties(await propertiesRes.json());
+      const response = await fetch(
+        `${API_URL}/maintenances/paginated?pagina=${pagina}`,
+        { headers }
+      );
+      const data = await response.json();
+      setMaintenances(data.maintenances || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os dados");
+      setMaintenances([]);
     } finally {
       setCarregando(false);
     }
   };
 
+  const buscarImoveis = async () => {
+    try {
+      const response = await fetch(`${API_URL}/properties`, { headers });
+      setProperties(await response.json());
+    } catch (err) {
+      setErro("Não foi possível carregar os imóveis");
+    }
+  };
+
   useEffect(() => {
-    buscarTudo();
+    buscarManutencoes(1);
+    buscarImoveis();
   }, []);
 
   const validarFormulario = () => {
@@ -83,7 +97,7 @@ const Maintenances = () => {
       setPropertyId("");
       setDescription("");
       setEstimatedCost("");
-      buscarTudo();
+      buscarManutencoes(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -100,7 +114,7 @@ const Maintenances = () => {
         headers,
       });
       setSucesso("Manutenção concluída!");
-      buscarTudo();
+      buscarManutencoes(paginaAtual);
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
       setErro("Não foi possível concluir a manutenção");
@@ -113,7 +127,7 @@ const Maintenances = () => {
         method: "DELETE",
         headers,
       });
-      buscarTudo();
+      buscarManutencoes(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir a manutenção");
     }
@@ -125,7 +139,6 @@ const Maintenances = () => {
         Manutenções
       </h1>
 
-      {/* Formulário de cadastro */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Registrar nova manutenção
@@ -174,7 +187,6 @@ const Maintenances = () => {
         </button>
       </div>
 
-      {/* Lista de manutenções */}
       <div className="mt-5 rounded-xl bg-white p-5 shadow dark:bg-navy-800">
         <h2 className="mb-3 text-lg font-bold text-navy-700 dark:text-white">
           Manutenções registradas
@@ -187,51 +199,75 @@ const Maintenances = () => {
             Nenhuma manutenção registrada ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {maintenances.map((maintenance) => (
-              <div
-                key={maintenance.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-              >
-                <div>
-                  <p className="font-medium text-navy-700 dark:text-white">
-                    {maintenance.property?.address}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {maintenance.description} • Custo estimado: R${" "}
-                    {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
-                    <span
-                      className={
-                        maintenance.status === "concluida"
-                          ? "font-medium text-green-600"
-                          : "font-medium text-orange-500"
-                      }
-                    >
-                      {maintenance.status}
-                    </span>
-                  </p>
+          <>
+            <div className="flex flex-col gap-3">
+              {maintenances.map((maintenance) => (
+                <div
+                  key={maintenance.id}
+                  className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div>
+                    <p className="font-medium text-navy-700 dark:text-white">
+                      {maintenance.property?.address}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {maintenance.description} • Custo estimado: R${" "}
+                      {Number(maintenance.estimatedCost).toFixed(2)} •{" "}
+                      <span
+                        className={
+                          maintenance.status === "concluida"
+                            ? "font-medium text-green-600"
+                            : "font-medium text-orange-500"
+                        }
+                      >
+                        {maintenance.status}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {maintenance.status === "pendente" && (
+                      <button
+                        onClick={() => handleConcluir(maintenance.id)}
+                        className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                      >
+                        Concluir
+                      </button>
+                    )}
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(maintenance.id)}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {maintenance.status === "pendente" && (
-                    <button
-                      onClick={() => handleConcluir(maintenance.id)}
-                      className="rounded-lg bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
-                    >
-                      Concluir
-                    </button>
-                  )}
-                  {admin && (
-                    <button
-                      onClick={() => handleExcluir(maintenance.id)}
-                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                    >
-                      Excluir
-                    </button>
-                  )}
-                </div>
+              ))}
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarManutencoes(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarManutencoes(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
