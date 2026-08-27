@@ -8,6 +8,8 @@ const API_URL = "http://localhost:3333/properties";
 
 const Properties = () => {
   const [properties, setProperties] = useState<any[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [address, setAddress] = useState("");
   const [type, setType] = useState("");
   const [rentValue, setRentValue] = useState("");
@@ -24,23 +26,26 @@ const Properties = () => {
   const token = localStorage.getItem("token");
   const admin = isAdmin();
 
-  const buscarImoveis = async () => {
+  const buscarImoveis = async (pagina = 1) => {
     setCarregando(true);
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${API_URL}/paginated?pagina=${pagina}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      setProperties(data);
+      setProperties(data.properties || []);
+      setTotalPaginas(data.totalPaginas || 1);
+      setPaginaAtual(data.paginaAtual || 1);
     } catch (err) {
       setErro("Não foi possível carregar os imóveis");
+      setProperties([]);
     } finally {
       setCarregando(false);
     }
   };
 
   useEffect(() => {
-    buscarImoveis();
+    buscarImoveis(1);
   }, []);
 
   const limparFormulario = () => {
@@ -112,14 +117,12 @@ const Properties = () => {
       );
 
       if (!editingId) {
-        // Ao criar um imóvel novo, entra automaticamente em modo de edição
-        // para liberar a galeria de fotos
         setEditingId(imovelSalvo.id);
       } else {
         limparFormulario();
       }
 
-      buscarImoveis();
+      buscarImoveis(paginaAtual);
 
       setTimeout(() => setSucesso(""), 4000);
     } catch (err) {
@@ -148,7 +151,7 @@ const Properties = () => {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      buscarImoveis();
+      buscarImoveis(paginaAtual);
     } catch (err) {
       setErro("Não foi possível excluir o imóvel");
     }
@@ -266,50 +269,75 @@ const Properties = () => {
             Nenhum imóvel cadastrado ainda.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {properties.map((property) => (
-              <div
-                key={property.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
-              >
-                <div className="flex items-center gap-3">
-                  {property.photoUrl && (
-                    <img
-                      src={property.photoUrl}
-                      alt={property.address}
-                      className="h-14 w-14 rounded-lg object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-navy-700 dark:text-white">
-                      {property.address} — {property.type}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      R$ {Number(property.rentValue).toFixed(2)} •{" "}
-                      {property.bedrooms} quartos • {property.bathrooms}{" "}
-                      banheiros • {property.status}
-                    </p>
+          <>
+            <div className="flex flex-col gap-3">
+              {properties.map((property) => (
+                <div
+                  key={property.id}
+                  className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                >
+                  <div className="flex items-center gap-3">
+                    {property.photoUrl && (
+                      <img
+                        src={property.photoUrl}
+                        alt={property.address}
+                        className="h-14 w-14 rounded-lg object-cover"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium text-navy-700 dark:text-white">
+                        {property.address} — {property.type}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        R$ {Number(property.rentValue).toFixed(2)} •{" "}
+                        {property.bedrooms} quartos • {property.bathrooms}{" "}
+                        banheiros • {property.status}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditar(property)}
+                      className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                    >
+                      Editar
+                    </button>
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(property.id)}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditar(property)}
-                    className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                  >
-                    Editar
-                  </button>
-                  {admin && (
-                    <button
-                      onClick={() => handleExcluir(property.id)}
-                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
-                    >
-                      Excluir
-                    </button>
-                  )}
-                </div>
+              ))}
+            </div>
+
+            {/* Paginação */}
+            {totalPaginas > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => buscarImoveis(paginaAtual - 1)}
+                  disabled={paginaAtual <= 1}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => buscarImoveis(paginaAtual + 1)}
+                  disabled={paginaAtual >= totalPaginas}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium text-navy-700 disabled:opacity-30 dark:text-white"
+                >
+                  Próxima
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

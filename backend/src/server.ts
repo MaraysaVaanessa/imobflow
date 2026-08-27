@@ -415,6 +415,34 @@ app.get("/properties", autenticar, async (req, res) => {
   }
 });
 
+// Versão paginada, usada apenas pela tela de listagem de Imóveis
+app.get("/properties/paginated", autenticar, async (req, res) => {
+  try {
+    const usuario = (req as any).usuario;
+    const pagina = Number(req.query.pagina) || 1;
+    const porPagina = 10;
+
+    const [properties, total] = await Promise.all([
+      prisma.property.findMany({
+        where: { companyId: usuario.companyId },
+        orderBy: { createdAt: "desc" },
+        skip: (pagina - 1) * porPagina,
+        take: porPagina,
+      }),
+      prisma.property.count({ where: { companyId: usuario.companyId } }),
+    ]);
+
+    res.json({
+      properties,
+      totalPaginas: Math.ceil(total / porPagina),
+      paginaAtual: pagina,
+    });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.put("/properties/:id", autenticar, async (req, res) => {
   try {
     const usuario = (req as any).usuario;
