@@ -13,6 +13,7 @@ import OwnerDashboard from "views/ownerPortal/Dashboard";
 import TenantLogin from "views/tenantPortal/Login";
 import TenantChangePassword from "views/tenantPortal/ChangePassword";
 import TenantDashboard from "views/tenantPortal/Dashboard";
+import AccessHub from "views/access/AccessHub";
 
 const App = () => {
   return (
@@ -45,7 +46,8 @@ const App = () => {
         element={<TenantChangePassword />}
       />
       <Route path="/portal-inquilino/dashboard" element={<TenantDashboard />} />
-      <Route path="/" element={<Navigate to="/admin" replace />} />
+      <Route path="/acesso" element={<AccessHub />} />
+      <Route path="/" element={<Navigate to="/acesso" replace />} />
     </Routes>
   );
 };

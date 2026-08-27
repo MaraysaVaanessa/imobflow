@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const API_URL = "http://localhost:3333";
 
@@ -51,6 +51,12 @@ const TenantLogin = () => {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-lightPrimary dark:bg-navy-900">
       <div className="w-full max-w-[420px] rounded-2xl bg-white p-8 shadow-xl dark:bg-navy-800">
+        <Link
+          to="/acesso"
+          className="mb-4 inline-block text-sm font-medium text-brand-500 hover:text-brand-600"
+        >
+          ← Voltar
+        </Link>
         <h1 className="mb-2 text-2xl font-bold text-navy-700 dark:text-white">
           Portal do Inquilino
         </h1>
