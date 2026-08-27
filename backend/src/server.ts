@@ -46,15 +46,21 @@ app.use(
 );
 
 // Limita tentativas de login: no máximo 5 tentativas a cada 15 minutos por IP
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: {
-    error: "Muitas tentativas de login. Tente novamente em alguns minutos.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const criarLoginLimiter = () =>
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: {
+      error: "Muitas tentativas de login. Tente novamente em alguns minutos.",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+const loginLimiter = criarLoginLimiter();
+const ownerLoginLimiter = criarLoginLimiter();
+const tenantLoginLimiter = criarLoginLimiter();
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -1991,7 +1997,7 @@ app.delete("/inspections/:id", autenticar, somenteAdmin, async (req, res) => {
 
 // ===== PORTAL DO PROPRIETÁRIO =====
 
-app.post("/owner-portal/login", loginLimiter, async (req, res) => {
+app.post("/owner-portal/login", ownerLoginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   const owner = await prisma.owner.findFirst({
@@ -2154,7 +2160,7 @@ app.get(
 
 // ===== PORTAL DO INQUILINO =====
 
-app.post("/tenant-portal/login", loginLimiter, async (req, res) => {
+app.post("/tenant-portal/login", tenantLoginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   const tenant = await prisma.tenant.findFirst({
