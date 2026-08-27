@@ -18,6 +18,9 @@ const Owners = () => {
   const [sucesso, setSucesso] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [acessoGerado, setAcessoGerado] = useState<{
+    [id: number]: { senha: string; email: string };
+  }>({});
 
   const token = localStorage.getItem("token");
   const admin = isAdmin();
@@ -132,6 +135,30 @@ const Owners = () => {
     }
   };
 
+  const handleGerarAcesso = async (id: number) => {
+    setErro("");
+    try {
+      const response = await fetch(`${API_URL}/${id}/generate-access`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErro(data.error || "Não foi possível gerar o acesso");
+        return;
+      }
+
+      setAcessoGerado({
+        ...acessoGerado,
+        [id]: { senha: data.senhaTemporaria, email: data.email },
+      });
+    } catch (err) {
+      setErro("Não foi possível conectar ao servidor");
+    }
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-navy-700 dark:text-white">
@@ -234,42 +261,81 @@ const Owners = () => {
             {owners.map((owner) => (
               <div
                 key={owner.id}
-                className="flex items-center justify-between rounded-lg border p-3 dark:border-white/10"
+                className="flex flex-col gap-2 rounded-lg border p-3 dark:border-white/10"
               >
-                <div className="flex items-center gap-3">
-                  {owner.photoUrl && (
-                    <img
-                      src={owner.photoUrl}
-                      alt={owner.name}
-                      className="h-14 w-14 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-navy-700 dark:text-white">
-                      {owner.name}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {owner.phone} • {owner.email} • CPF: {owner.cpf}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {owner.address}
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {owner.photoUrl && (
+                      <img
+                        src={owner.photoUrl}
+                        alt={owner.name}
+                        className="h-14 w-14 rounded-full object-cover"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium text-navy-700 dark:text-white">
+                        {owner.name}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {owner.phone} • {owner.email} • CPF: {owner.cpf}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {owner.address}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditar(owner)}
+                      className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                    >
+                      Editar
+                    </button>
+                    {admin && (
+                      <button
+                        onClick={() => handleExcluir(owner.id)}
+                        className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      >
+                        Excluir
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditar(owner)}
-                    className="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-                  >
-                    Editar
-                  </button>
+
+                <div className="border-t pt-2 dark:border-white/10">
                   {admin && (
                     <button
-                      onClick={() => handleExcluir(owner.id)}
-                      className="rounded-lg bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                      onClick={() => handleGerarAcesso(owner.id)}
+                      className="rounded-lg border border-brand-500 px-3 py-1 text-xs font-medium text-brand-500 hover:bg-brand-50 dark:hover:bg-navy-700"
                     >
-                      Excluir
+                      Gerar acesso ao Portal do Proprietário
                     </button>
+                  )}
+
+                  {acessoGerado[owner.id] && (
+                    <div className="mt-2 rounded-lg bg-lightPrimary p-3 text-sm dark:bg-navy-900">
+                      <p className="font-medium text-navy-700 dark:text-white">
+                        Repasse estas credenciais ao proprietário:
+                      </p>
+                      <p className="mt-1 text-gray-700 dark:text-gray-300">
+                        Portal:{" "}
+                        <span className="font-mono">
+                          localhost:3000/portal-proprietario/login
+                        </span>
+                      </p>
+                      <p className="text-gray-700 dark:text-gray-300">
+                        Email:{" "}
+                        <span className="font-mono">
+                          {acessoGerado[owner.id].email}
+                        </span>
+                      </p>
+                      <p className="text-gray-700 dark:text-gray-300">
+                        Senha temporária:{" "}
+                        <span className="font-mono font-bold">
+                          {acessoGerado[owner.id].senha}
+                        </span>
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
